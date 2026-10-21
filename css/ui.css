@@ -142,6 +142,7 @@
 .titlecard { position: absolute; left: 50%; top: 36%; transform: translate(-50%, -50%); z-index: 7; pointer-events: none; display: flex; flex-direction: column; align-items: center; animation: tcard 1.7s ease-in-out forwards; }
 .titlecard .t1 { font-size: 1.5rem; color: #ffe680; padding: .2rem 1.4rem; border-radius: 1rem; background: rgba(20,12,42,.75); }
 .titlecard .t2 { font-size: 3.2rem; white-space: nowrap; }
+.titlecard .t3 { font-size: 1.3rem; color: #fff; margin-top: .2rem; text-align: center; max-width: 34rem; }
 @keyframes tcard { 0% { opacity: 0; transform: translate(-30%, -50%); } 15%, 80% { opacity: 1; transform: translate(-50%, -50%); } 100% { opacity: 0; transform: translate(-70%, -50%); } }
 
 .vs { position: absolute; inset: 0; z-index: 8; pointer-events: none; overflow: hidden; }

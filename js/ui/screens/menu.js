@@ -5,7 +5,7 @@ import { fmt, fmtTime } from '../../core/util.js';
 import { sfx, applyVolumes, playMusic } from '../../core/audio.js';
 import { registerScreen, rerender, closeScreen, openScreen } from '../screens.js';
 import { $, ico, el, modal, toast } from '../dom.js';
-import { REGIONS, stageInfo } from '../../data/regions.js';
+import { REGIONS, STAGES_PER_CYCLE, stageInfo } from '../../data/regions.js';
 import { SLIMES, SLIME } from '../../data/slimes.js';
 import { RELICS, TREASURES } from '../../data/relics.js';
 import { biomeLayers, BIOMES } from '../../art/scenery.js';
@@ -95,28 +95,35 @@ registerScreen('profile', {
 // ------------------------------------------------------------------ world map
 registerScreen('map', {
   render(body) {
-    const cur = stageInfo(S.stage), maxR = Math.floor((S.maxStage - 1) / 10);
-    const cycles = Math.floor((S.maxStage - 1) / 80);
+    const cur = stageInfo(S.stage);
+    const cycles = Math.floor((S.maxStage - 1) / STAGES_PER_CYCLE);
     body.innerHTML = `<div class="scr-head"><div class="scr-title f-num ol">${ico('map')}Mapa-múndi</div></div>
       <div class="scr-scroll"><p class="ol-s" style="text-align:center;font-size:1.4rem;margin:.2rem 0 1rem">Localização atual: <span style="color:#ffe680">${cur.label}</span></p>
       ${REGIONS.map((r, i) => {
-        const gStart = cycles * 80 + i * 10 + 1;
-        const reachedAny = S.maxStage >= i * 10 + 1;
-        const open = S.maxStage >= gStart || reachedAny;
-        const first = Math.min(S.maxStage, open ? (S.maxStage >= gStart ? gStart : i * 10 + 1) : gStart);
+        // stage numbers of this saga in the furthest cycle reached (or the first cycle if not reached there yet)
+        const base = (S.maxStage >= cycles * STAGES_PER_CYCLE + i * 10 + 1 ? cycles : Math.max(0, cycles - 1)) * STAGES_PER_CYCLE + i * 10;
+        const open = S.maxStage >= base + 1;
         const here = cur.ri === i;
         const b = BIOMES[r.bg];
-        const done = Math.max(0, Math.min(10, S.maxStage - 1 - (Math.floor((S.maxStage - 1) / 80) * 80) - i * 10));
+        const done = Math.max(0, Math.min(10, S.maxStage - 1 - base));
+        const rows = r.stages.map((st, j) => {
+          const g = base + j + 1, reach = S.maxStage >= g, now = S.stage === g;
+          return `<button class="${reach ? '' : 'off'}" data-g="${reach && !now ? g : 0}" style="display:flex;gap:.8rem;align-items:center;width:100%;text-align:left;padding:.6rem .8rem;border-radius:.8rem;background:${now ? 'rgba(255,230,128,.18)' : 'rgba(0,0,0,.18)'};color:${reach ? '#fff' : 'var(--txt3)'};font-size:1.2rem;margin-top:.4rem">
+            <b class="f-num" style="min-width:3.6rem;color:${g < S.maxStage ? '#7ee07e' : '#ffe680'}">${r.n}-${st.s}</b>
+            <span style="flex:1"><b>${st.boss}</b><br><span style="color:var(--txt3)">${st.arc} · ${st.terr}</span></span>
+            ${reach ? '' : `<span style="width:2rem;height:2rem">${icon('lock')}</span>`}</button>`;
+        }).join('');
         return `<div class="panelx" style="padding:0;overflow:hidden;${open ? '' : 'filter:grayscale(.85) brightness(.6)'}">
           <div style="height:9rem;position:relative;background:linear-gradient(${b.sky[0]},${b.sky[2]})">
             <div style="position:absolute;left:0;right:0;bottom:0;height:7rem;background-image:url('data:image/svg+xml;utf8,${encodeURIComponent(biomeLayers(r.bg).mid)}');background-size:auto 100%;background-repeat:repeat-x"></div>
             <div style="position:absolute;left:0;right:0;bottom:0;height:1.6rem;background:${b.ground[0]}"></div>
             ${here ? `<div style="position:absolute;left:1rem;bottom:.6rem;width:5rem;height:4.6rem;animation:bob 1.6s ease-in-out infinite">${slimeParts({ color: SLIME[S.slimes.cur].color, hat: SLIME[S.slimes.cur].hat }).full('happy')}</div>` : ''}
           </div>
-          <div style="display:flex;align-items:center;gap:1rem;padding:1rem 1.2rem">
-            <div style="flex:1"><div class="f-num ol" style="font-size:1.9rem">${r.name}</div><div style="font-size:1.25rem;color:var(--txt3)">${open ? `${done}/10 fases concluídas` : `Chegue à fase ${i * 10 + 1}`}</div></div>
-            ${open ? `<button class="btn sm ${here ? 'gray' : 'blue'} ol-s" data-g="${here ? 0 : first}">${here ? 'Aqui' : 'Ir'}</button>` : `<span style="width:3.4rem;height:3.4rem">${icon('lock')}</span>`}
-          </div></div>`;
+          <details ${here ? 'open' : ''} style="padding:1rem 1.2rem">
+            <summary style="display:flex;align-items:center;gap:1rem;list-style:none;cursor:pointer">
+              <div style="flex:1"><div style="font-size:1.2rem;color:#ffe680">Saga ${r.n}</div><div class="f-num ol" style="font-size:1.9rem">${r.name}</div><div style="font-size:1.25rem;color:var(--txt3)">${open ? `${done}/10 fases concluídas` : `Chegue à fase ${base + 1}`}</div></div>
+              ${open ? '' : `<span style="width:3.4rem;height:3.4rem">${icon('lock')}</span>`}
+            </summary>${rows}</details></div>`;
       }).join('')}<div style="height:2rem"></div></div>`;
     body.querySelectorAll('[data-g]').forEach(btn => btn.onclick = () => {
       const g = +btn.dataset.g;

@@ -73,11 +73,17 @@ export function challengeBoss() {
   B.queue.length = 0;
   for (const e of B.enemies) if (e.state !== 'die') { e.state = 'flee'; }
   setPhase('bossIntro');
-  emit('bossIntro', { g: B.g, key: B.info.region.boss, spec: BOSSES[B.info.region.boss] });
+  emit('bossIntro', { g: B.g, key: B.info.region.boss, spec: bossSpec() });
+}
+
+// the stage boss is drawn with an existing look but carries its own name
+export function bossSpec(info = B.info) {
+  const r = info.region;
+  return Object.assign({}, BOSSES[r.boss] || ARCHETYPES[r.boss], { name: r.bossName });
 }
 
 function spawn(kind, boss = false) {
-  const spec = boss ? BOSSES[kind] : ARCHETYPES[kind];
+  const spec = boss ? bossSpec() : ARCHETYPES[kind];
   const g = B.g;
   const tier = B.info.cycle - 1 + (boss ? 0 : 0);
   const hp = boss ? BAL.bossHp(g) : BAL.enemyHp(g) * (spec.fast ? 0.8 : spec.hat === 'knight' ? 1.4 : 1);
@@ -190,7 +196,7 @@ export function update(dt) {
       B.spawnT -= dt;
       if (!B.queue.length && !live.length) {
         if (S.farm) { B.kills = 0; refillQueue(); emit('progress'); }
-        else { setPhase('bossIntro'); emit('bossIntro', { g: B.g, key: B.info.region.boss, spec: BOSSES[B.info.region.boss] }); }
+        else { setPhase('bossIntro'); emit('bossIntro', { g: B.g, key: B.info.region.boss, spec: bossSpec() }); }
       }
       const near = live.some(e => e.x < hero.x + 230);
       B.walking = !near;

@@ -18,7 +18,7 @@ function put(node, ms) { fxBox().appendChild(node); setTimeout(() => node.remove
 
 export function buildOverlays() {
   on('stageTitle', info => {
-    put(el(`<div class="titlecard"><span class="t1 f-num ol-s">Fase ${info.g}</span><span class="t2 f-num ol">${info.label}</span></div>`), 1800);
+    put(el(`<div class="titlecard"><span class="t1 f-num ol-s">${info.saga.name} · Fase ${info.short}</span><span class="t2 f-num ol">${info.stage.arc}</span><span class="t3 ol-s">${info.stage.terr}</span></div>`), 1800);
   });
   on('bossIntro', d => {
     const sl = SLIME[S.slimes.cur] || SLIME.gelatino;
