@@ -43,8 +43,18 @@ const ART = {
     P('M 8 32 Q -2 22 2 16 Q 8 22 12 26 Z', '#5cc8ff', 3) + L('M 32 18 Q 30 8 26 4 M 32 18 Q 34 8 40 6', 3, '#bdf3ff') + eyes(42, 50, 32, 2.6) + blush(40, 54, 39),
 };
 const cache = new Map();
+const ONE_PIECE_NAMES = {
+  pintinho:'luffy', gato:'zoro', morcego:'nami', sapo:'sanji', raposa:'chopper', abelha:'robin', coruja:'franky', fantasma:'brook',
+  dragaozinho:'luffy', unicornio:'zoro', fenix:'nami', golem:'sanji', polvo:'chopper', estrela:'robin', leao:'franky', baleia:'brook'
+};
 export function petSVG(p) {
   let v = cache.get(p.id);
-  if (!v) { v = svg(64, 64, (ART[p.id] || ART.pintinho)()); cache.set(p.id, v); }
+  if (!v) {
+    const spriteName = ONE_PIECE_NAMES[p.id];
+    v = spriteName
+      ? `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><image href="assets/pets/${spriteName}.png" x="7" y="0" width="50" height="64" preserveAspectRatio="xMidYMax meet"/></svg>`
+      : svg(64, 64, (ART[p.id] || ART.pintinho)());
+    cache.set(p.id, v);
+  }
   return v;
 }

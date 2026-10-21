@@ -9,7 +9,22 @@ export function setScale(s) {
 }
 export const getScale = () => scale;
 
+// An SVG drawn via <img> cannot load external files, so PNG hrefs are inlined first.
+const dataUrls = new Map();
+function inlineImages(str) {
+  const urls = [...new Set([...str.matchAll(/href="(assets\/[^"]+)"/g)].map(m => m[1]))];
+  return Promise.all(urls.map(u => {
+    if (!dataUrls.has(u)) dataUrls.set(u, fetch(u).then(r => r.blob()).then(b => new Promise(ok => {
+      const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.readAsDataURL(b);
+    })));
+    return dataUrls.get(u).then(d => { str = str.split(`href="${u}"`).join(`href="${d}"`); });
+  })).then(() => str);
+}
+
 export function rasterize(svgStr, w, h, sc = scale) {
+  return inlineImages(svgStr).then(str => rasterizeSvg(str, w, h, sc));
+}
+function rasterizeSvg(svgStr, w, h, sc) {
   const pw = Math.max(1, Math.round(w * sc)), ph = Math.max(1, Math.round(h * sc));
   const s = svgStr.replace('<svg ', `<svg width="${pw}" height="${ph}" preserveAspectRatio="none" `);
   const url = URL.createObjectURL(new Blob([s], { type: 'image/svg+xml' }));
