@@ -1,0 +1,12 @@
+{
+  "name": "reino-gelatina",
+  "version": "1.0.0",
+  "private": true,
+  "description": "RPG idle de uma gosma rei. HTML, CSS e JavaScript puro, sem build.",
+  "type": "module",
+  "scripts": {
+    "start": "npx --yes serve -l 8080 .",
+    "sim": "node tools/sim.mjs"
+  },
+  "license": "MIT"
+}

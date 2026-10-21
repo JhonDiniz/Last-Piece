@@ -1,0 +1,54 @@
+@font-face { font-family: 'Lilita One'; src: url('../assets/fonts/lilita-one.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'Nunito'; font-weight: 800; src: url('../assets/fonts/nunito-800.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'Nunito'; font-weight: 900; src: url('../assets/fonts/nunito-900.woff2') format('woff2'); font-display: swap; }
+
+:root {
+  --ol: #2a1a3e;
+  --ink: #170f2e;
+  --bg0: #120c26; --bg1: #1c1438; --bg2: #271d4d; --bg3: #33275f; --bg4: #3e3172; --bg5: #4b3c88;
+  --row: #33285f; --row2: #3a2e6b;
+  --txt: #ffffff; --txt2: #d6ccff; --txt3: #a99ce0; --txt4: #7d70b8;
+  --gold: #ffcc3a; --gem: #d36cff; --lime: #72dc4a; --lime2: #3aa82e; --red: #ff4f6a; --cyan: #4cc9f0; --orange: #ff9a2e; --pink: #ff6fa8;
+  --sat: env(safe-area-inset-top, 0px); --sab: env(safe-area-inset-bottom, 0px);
+  font-size: 10px;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #0d0920; overscroll-behavior: none; }
+body {
+  font-family: 'Nunito', system-ui, sans-serif; font-weight: 900; color: var(--txt);
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation;
+  display: flex; align-items: center; justify-content: center;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(104, 221, 140, .12), transparent 40%),
+    radial-gradient(circle at 80% 70%, rgba(211, 108, 255, .14), transparent 45%),
+    repeating-linear-gradient(45deg, #140d2b 0 18px, #170f31 18px 36px);
+}
+button { font: inherit; color: inherit; border: 0; background: none; padding: 0; cursor: pointer; touch-action: manipulation; }
+svg { display: block; overflow: visible; }
+
+#app {
+  position: relative; width: 100%; height: 100%; max-width: 520px; overflow: hidden;
+  display: flex; flex-direction: column; background: var(--bg1);
+  box-shadow: 0 0 0 2px #0a0618, 0 30px 80px rgba(0, 0, 0, .55);
+}
+@media (min-width: 560px) { #app { border-radius: 2.4rem; height: min(100%, 980px); } }
+
+.f-num { font-family: 'Lilita One', 'Nunito', sans-serif; font-weight: 400; letter-spacing: .02em; }
+.ol { text-shadow: 0 .2rem 0 var(--ol), .2rem 0 0 var(--ol), -.2rem 0 0 var(--ol), 0 -.2rem 0 var(--ol), .14rem .14rem 0 var(--ol), -.14rem .14rem 0 var(--ol), .14rem -.14rem 0 var(--ol), -.14rem -.14rem 0 var(--ol), 0 .32rem 0 var(--ol); }
+.ol-s { text-shadow: 0 .14rem 0 var(--ol), .14rem 0 0 var(--ol), -.14rem 0 0 var(--ol), 0 -.14rem 0 var(--ol), .1rem .1rem 0 var(--ol), -.1rem .1rem 0 var(--ol), .1rem -.1rem 0 var(--ol), -.1rem -.1rem 0 var(--ol); }
+.hide { display: none !important; }
+.ico { display: inline-block; width: 1em; height: 1em; vertical-align: middle; }
+.ico svg { width: 100%; height: 100%; }
+
+/* boot splash */
+#boot {
+  position: fixed; inset: 0; z-index: 999; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2rem;
+  background: radial-gradient(circle at 50% 40%, #3a2c7a, #160f30 70%); transition: opacity .5s;
+}
+#boot .logo { width: 22rem; animation: bob 1.6s ease-in-out infinite; }
+#boot h1 { margin: 0; font-family: 'Lilita One', sans-serif; font-weight: 400; font-size: 4rem; color: #fff; letter-spacing: .04em; }
+#boot h1 span { color: #7dff6a; }
+#boot .bar { width: 22rem; height: 1.6rem; border-radius: 1rem; background: #1a1236; border: .3rem solid var(--ol); overflow: hidden; }
+#boot .bar i { display: block; height: 100%; width: 0; background: linear-gradient(#a8ff7a, #4fc23a); transition: width .2s; }
+#boot p { margin: 0; color: var(--txt3); font-size: 1.4rem; }
+@keyframes bob { 50% { transform: translateY(-1rem) scale(1.03, .97); } }
