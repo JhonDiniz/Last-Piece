@@ -75,15 +75,14 @@ export function claimMission() {
 export function isOpen(f) {
   if (f in UNLOCK) return S.mission >= UNLOCK[f];
   if (f === 'rebirth') return S.maxStage >= 50 || S.rebirth.n > 0;
-  if (f === 'slimes') return Object.keys(S.slimes.own).length > 1 || S.maxStage >= 11;
   return true;
 }
 export function checkUnlocks() {
-  for (const f of [...Object.keys(UNLOCK), 'rebirth', 'slimes']) {
+  for (const f of [...Object.keys(UNLOCK), 'rebirth']) {
     if (isOpen(f) && !S.unlocked[f]) {
       S.unlocked[f] = true;
-      emit('unlock', { f, name: UNLOCK_NAMES[f] || (f === 'rebirth' ? 'Renascer' : 'Minhas gosmas') });
+      emit('unlock', { f, name: UNLOCK_NAMES[f] || 'Renascer' });
     }
   }
 }
-export function silentUnlocks() { for (const f of [...Object.keys(UNLOCK), 'rebirth', 'slimes']) if (isOpen(f)) S.unlocked[f] = true; }
+export function silentUnlocks() { for (const f of [...Object.keys(UNLOCK), 'rebirth']) if (isOpen(f)) S.unlocked[f] = true; }

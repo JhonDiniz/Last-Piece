@@ -1,4 +1,4 @@
-// "Gosma" screen: slime, skills, companions, relics, attributes.
+// "Pirata" screen: captain, ship, skills, crew, relics, attributes.
 import { S } from '../../core/state.js';
 import { on, emit } from '../../core/bus.js';
 import { fmt, fmtS, fmtPct, fmtDec } from '../../core/util.js';
@@ -9,101 +9,104 @@ import { card, detail, gstyle, gradeBadge } from '../cards.js';
 import { GRADES, fuseNeed } from '../../data/balance.js';
 import { SKILLS, SKILL, skillPassive, skillDmg } from '../../data/skills.js';
 import { GEAR, GEAR_BY, SLOTS, SLOT, gearEq, gearPas } from '../../data/gear.js';
-import { PETS, PET, petAtk, petSpd, petPassive, PET_SLOTS } from '../../data/pets.js';
-import { SLIMES, SLIME, RANKS, RANK_COL, MILESTONES, MILESTONE_BONUS, UNIQUE_LV, slimeNeed, slimeBase } from '../../data/slimes.js';
+import { PETS, PET, petAtk, petSpd, petPassive, PET_SLOTS, ultDesc } from '../../data/pets.js';
+import { TRAINING, HAKI, xpNeed, LV_MAX } from '../../data/hero.js';
+import { SHIPS, SHIP, SHIP_MAX, shipMul, shipUpCost, RANK_NAMES, RANK_COLS } from '../../data/ships.js';
 import { RELICS, RELIC, TREASURES, RELIC_MAX, relicCost } from '../../data/relics.js';
 import { UPGRADES, UP } from '../../data/balance.js';
 import { skillIcon, gearIcon, relicIcon, treasureIcon, unknownIcon } from '../../art/items.js';
 import { petSVG } from '../../art/pets.js';
-import { slimeParts } from '../../art/slime.js';
+import { avatarSVG } from '../../art/avatar.js';
+import { shipSVG } from '../../art/ship.js';
 import { icon } from '../../art/icons.js';
 import { ST, BONUS } from '../../game/stats.js';
 import { isOpen } from '../../game/progress.js';
 import { UNLOCK } from '../../data/missions.js';
 import { equipSkill, unequipSkill, autoEquipSkills, fuseAll, fuseItem, canFuse } from '../../game/skills.js';
-import { equipGear, unequipGear, autoEquipGear, gearSlotOpen, petSlotsOpen, equipPet, unequipPet, autoEquipPets, setSlime, slimeLevelUp, slimeCanLevel, relicLevelUp } from '../../game/collection.js';
+import { equipGear, unequipGear, autoEquipGear, gearSlotOpen, petSlotsOpen, equipPet, unequipPet, autoEquipPets, relicLevelUp } from '../../game/collection.js';
+import { spendPoint, resetPoints, hakiOpen } from '../../game/hero.js';
+import { setShip, shipUpgrade } from '../../game/ship.js';
+import { openCreator } from '../creator.js';
 
 const TABS = [
-  { k: 'Gosma', open: () => true },
+  { k: 'Pirata', open: () => true },
+  { k: 'Barco', open: () => true },
   { k: 'Habilidade', open: () => isOpen('skills'), lock: `Missão ${UNLOCK.skills}` },
-  { k: 'Companheiro', open: () => isOpen('pets'), lock: `Missão ${UNLOCK.pets}` },
+  { k: 'Bando', open: () => isOpen('pets'), lock: `Missão ${UNLOCK.pets}` },
   { k: 'Relíquia', open: () => isOpen('raid'), lock: `Missão ${UNLOCK.raid}` },
   { k: 'Atributo', open: () => true },
 ];
-let tab = 'Gosma', selSlot = -1, newIds = new Set();
+let tab = 'Pirata', selSlot = -1, newIds = new Set();
 on('summoned', d => { for (const r of d.res) if (r.isNew) newIds.add(r.id); });
 
-const slimeArt = (id, face = 'idle') => { const s = SLIME[id]; return slimeParts({ color: s.color, hat: s.hat }).full(face); };
 const pct = v => '+' + fmt(Math.round(v * 100)) + '%';
 
 registerScreen('slime', {
   render(body, arg) {
     if (arg) tab = arg;
     const t = TABS.find(x => x.k === tab);
-    if (t && !t.open()) tab = 'Gosma';
-    body.innerHTML = `<div class="scr-head"><div class="scr-title f-num ol">${ico(tab === 'Habilidade' ? 'book' : tab === 'Companheiro' ? 'paw' : tab === 'Relíquia' ? 'relic' : tab === 'Atributo' ? 'sword' : 'slime')}${tab}</div></div>
+    if (arg === 'Companheiro') tab = 'Bando';
+    if (!TABS.find(x => x.k === tab) || (t && !t.open())) tab = 'Pirata';
+    body.innerHTML = `<div class="scr-head"><div class="scr-title f-num ol">${ico(tab === 'Habilidade' ? 'book' : tab === 'Bando' ? 'paw' : tab === 'Relíquia' ? 'relic' : tab === 'Atributo' ? 'sword' : tab === 'Barco' ? 'ship' : 'pirate')}${tab}</div></div>
       <div class="scr-scroll" id="slScroll"></div>
-      <div class="tabs">${TABS.map(x => `<button class="tab f-num ol-s${x.k === tab ? ' on' : ''}${x.open() ? '' : ' locked'}" data-t="${x.k}">${x.open() ? '' : ico('lock')}${x.k}</button>`).join('')}</div>`;
+      <div class="tabs t6">${TABS.map(x => `<button class="tab f-num ol-s${x.k === tab ? ' on' : ''}${x.open() ? '' : ' locked'}" data-t="${x.k}">${x.open() ? '' : ico('lock')}${x.k}</button>`).join('')}</div>`;
     body.querySelectorAll('.tab').forEach(b => b.onclick = () => {
       const x = TABS.find(y => y.k === b.dataset.t);
       if (!x.open()) { sfx('nogold'); toast(`Desbloqueia na ${x.lock}`, 'lock'); return; }
       sfx('tap'); tab = x.k; selSlot = -1; rerender();
     });
     const sc = body.querySelector('#slScroll');
-    ({ Gosma: tabSlime, Habilidade: tabSkills, Companheiro: tabPets, 'Relíquia': tabRelics, Atributo: tabStats })[tab](sc);
+    ({ Pirata: tabPirate, Barco: tabShip, Habilidade: tabSkills, Bando: tabPets, 'Relíquia': tabRelics, Atributo: tabStats })[tab](sc);
   },
   onClose() { newIds.clear(); emit('dots'); },
 });
 const refresh = () => { if (screenOpen() === 'slime') { const sc = $('#slScroll'); const y = sc ? sc.scrollTop : 0; rerender(); const n = $('#slScroll'); if (n) n.scrollTop = y; } };
-on('collection', refresh); on('skills', refresh); on('gear', refresh); on('pets', refresh); on('slime', refresh); on('relics', refresh);
+on('collection', refresh); on('skills', refresh); on('gear', refresh); on('pets', refresh); on('hero', refresh); on('ship', refresh); on('relics', refresh); on('levelUp', refresh); on('newShip', refresh);
 
-// ------------------------------------------------------------------ Gosma
-function tabSlime(sc) {
-  const id = S.slimes.cur, sl = SLIME[id], own = S.slimes.own[id];
-  const need = slimeNeed(own.lv);
+// ------------------------------------------------------------------ Pirata
+function tabPirate(sc) {
+  const H = S.hero, need = xpNeed(H.lv);
   const gearRow = SLOTS.map(slot => {
     const open = gearSlotOpen(slot.k), gid = S.gear.eq[slot.k], it = gid && GEAR_BY[gid];
     return `<button class="card${it ? '' : ' none'}" data-slot="${slot.k}" style="${it ? gstyle(it.g) : ''}">
       <div class="art">${it ? gearIcon(it) : open ? `<div style="opacity:.5">${icon(slot.k === 'weapon' ? 'sword' : slot.k === 'armor' ? 'heart' : slot.k === 'ring' ? 'relic' : 'treasure')}</div>` : icon('lock')}</div>
       <span class="nv f-num ol-s">${it ? 'NV' + S.gear.own[gid].lv : slot.name}</span>${!open ? `<div class="bar"><span class="f-num ol-s">Fase ${slot.unlock}</span></div>` : ''}</button>`;
   }).join('');
-  const ms = MILESTONES.map((m, i) => {
-    const on = own.lv >= m, b = MILESTONE_BONUS[i];
-    return `<div style="display:flex;flex-direction:column;align-items:center;gap:.2rem;opacity:${on ? 1 : .45}"><div style="width:3.6rem;height:3.6rem">${icon(b.stat === 'hp' ? 'heart' : b.stat === 'gold' ? 'gold' : b.stat === 'all' ? 'star' : 'sword')}</div><span class="f-num ol-s" style="font-size:1.1rem">NV ${m}</span></div>`;
-  }).join('');
-  const passTxt = MILESTONES.map((m, i) => { const b = MILESTONE_BONUS[i]; return `NV ${m}: ${b.stat === 'all' ? 'ATQ e PV' : b.stat === 'hp' ? 'PV' : b.stat === 'gold' ? 'Ouro' : 'ATQ'} +${Math.round(b.v[sl.r] * 100)}%`; }).join(' · ');
+  const row = (k, name, ic, col, p, max, desc, locked) => `<div class="trow${locked ? ' locked' : ''}">
+      <span class="ti" style="--c:${col}">${ic}</span>
+      <div class="tt"><div class="tn"><b class="f-num ol-s">${name}</b><span class="f-num ol-s">${locked ? '' : `${p}/${max}`}</span></div><div class="td">${desc}</div></div>
+      <button class="btn sm ol-s tplus" data-pt="${k}"${locked || H.pts <= 0 || p >= max ? ' disabled' : ''}>${locked ? ico('lock') : ico('plus')}</button></div>`;
   sc.innerHTML = `
     <div class="panelx" style="display:flex;gap:1.2rem;align-items:center;background:linear-gradient(#5fb3e6,#3a7ac0)">
-      <div style="width:13rem;height:12rem;flex:none;position:relative"><div style="position:absolute;left:1rem;right:1rem;bottom:.2rem;height:2rem;border-radius:50%;background:rgba(20,10,40,.3)"></div><div style="position:absolute;inset:0;animation:bob 2.2s ease-in-out infinite">${slimeArt(id)}</div></div>
+      <div style="width:12rem;height:13rem;flex:none;position:relative"><div style="position:absolute;left:1rem;right:1rem;bottom:.2rem;height:1.6rem;border-radius:50%;background:rgba(20,10,40,.3)"></div><div style="position:absolute;inset:0;animation:bob 2.2s ease-in-out infinite">${avatarSVG(H.look)}</div></div>
       <div style="flex:1;min-width:0">
-        <div style="display:flex;align-items:center;gap:.6rem"><span class="f-num ol" style="font-size:2.6rem;color:${RANK_COL[sl.r]}">${RANKS[sl.r]}</span><span class="f-num ol" style="font-size:2rem">${sl.name}</span></div>
-        <div class="f-num ol-s" style="font-size:1.6rem;margin:.3rem 0">NV ${own.lv}</div>
-        <div class="det" style="align-items:stretch"><div class="bigbar${own.cp >= need ? ' full' : ''}" style="width:100%"><i style="width:${Math.min(100, own.cp / need * 100)}%"></i><span class="f-num ol-s">${own.cp}/${need}</span></div></div>
-        <button class="btn sm ol-s" id="slUp" style="margin-top:.6rem;width:100%"${slimeCanLevel(id) ? '' : ' disabled'}>${ico('arrowUp')}Melhorar</button>
+        <div class="f-num ol" style="font-size:2.2rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${S.name}</div>
+        <div class="f-num ol-s" style="font-size:1.6rem;margin:.3rem 0">Nível ${H.lv}${H.lv >= LV_MAX ? ' (máx.)' : ''}</div>
+        <div class="det" style="align-items:stretch"><div class="bigbar" style="width:100%"><i style="width:${H.lv >= LV_MAX ? 100 : Math.min(100, H.xp / need * 100)}%"></i><span class="f-num ol-s">${H.lv >= LV_MAX ? 'MÁX' : `${fmt(H.xp)}/${fmt(need)} XP`}</span></div></div>
+        <button class="btn sm purple ol-s" id="hLook" style="margin-top:.6rem;width:100%">${ico('user')}Editar visual</button>
       </div>
     </div>
+    <div class="passive" style="margin-top:1rem">${ico('star')} Pontos de treino: <b>${H.pts}</b> <span style="color:var(--txt3);font-size:1.2rem">(+1 por nível)</span></div>
+    <div class="sec">Treino</div>
+    ${TRAINING.map(t => row(t.k, t.name, icon(t.icon), t.col, H.train[t.k], t.max, t.desc(H.train[t.k]), false)).join('')}
+    <div class="sec">Haki</div>
+    ${HAKI.map(h => row(h.k, h.name, `<span style="display:block;width:100%;height:100%;border-radius:50%;background:radial-gradient(circle at 40% 35%, #fff, ${h.col} 45%, #2a1a3e)"></span>`, h.col, H.haki[h.k], h.max,
+      hakiOpen(h.k) ? h.desc(H.haki[h.k]) : `Libera no nível ${h.lv}`, !hakiOpen(h.k))).join('')}
+    <div class="btnrow"><button class="btn sm gray ol-s" id="hReset">${ico('rebirth')}Redistribuir pontos</button></div>
     <div class="sec">Equipamento</div>
     <div class="grid g4">${gearRow}</div>
     <div class="btnrow"><button class="btn sm blue ol-s" id="gAuto">${ico('check')}Equipar melhor</button><button class="btn sm purple ol-s" id="gFuse">${ico('arrowUp')}Fundir tudo</button></div>
-    <div class="sec">Habilidade da gosma</div>
-    <div class="passive" style="flex-direction:column;align-items:flex-start;gap:.3rem;text-align:left"><span class="f-num ol-s" style="color:#ffe680;font-size:1.6rem">${sl.ability.name}</span><span style="color:var(--txt2);font-size:1.35rem">${sl.ability.desc}</span>
-      <span style="font-size:1.3rem;color:${own.lv >= UNIQUE_LV ? '#9dff7a' : 'var(--txt3)'}">${own.lv >= UNIQUE_LV ? '' : `${ico('lock')} NV ${UNIQUE_LV}: `}Habilidade única — ${sl.unique.name}: ${sl.unique.desc}</span></div>
-    <div class="sec">Efeito passivo</div>
-    <div class="passive" style="justify-content:space-around">${ms}</div>
-    <p style="font-size:1.2rem;color:var(--txt3);text-align:center;margin:.6rem 0 0">${passTxt}</p>
-    <div class="sec">Minhas gosmas <span style="color:var(--txt3);font-size:1.3rem">(${Object.keys(S.slimes.own).length}/${SLIMES.length})</span></div>
-    <div class="grid g4" id="slGrid">${SLIMES.map(s => {
-      const o = S.slimes.own[s.id];
-      return `<button class="card${o ? '' : ' none'}${s.id === id ? ' sel' : ''}" data-sl="${s.id}" style="--gc:${o ? '#3a4a8a' : '#2a2248'};--gc2:${o ? '#6a8ae8' : '#221a3c'};--gb:${RANK_COL[s.r]}">
-        <div class="art">${slimeArt(s.id)}</div><span class="nv f-num ol-s" style="color:${RANK_COL[s.r]}">${RANKS[s.r]}</span>
-        ${o ? `<div class="bar${slimeCanLevel(s.id) ? ' full' : ''}"><i style="width:${Math.min(100, o.cp / slimeNeed(o.lv) * 100)}%"></i><span class="f-num ol-s">NV${o.lv}</span></div>` : `<div class="bar"><span class="f-num ol-s" style="font-size:.9rem">Não possui</span></div>`}
-        ${s.id === id ? `<i class="eq">${ico('check')}</i>` : ''}</button>`;
-    }).join('')}</div>
     <div class="sec">Coleção de equipamentos</div>
     <div class="passive">${ico('sword')} ATQ <b>${pct(BONUS.gearAtk || 0)}</b> &nbsp; ${ico('heart')} PV <b>${pct(BONUS.gearHp || 0)}</b></div>
     <div class="grid" id="gGrid" style="margin-top:1rem">${GEAR.filter(x => gearSlotOpen(x.slot)).map(x => card(x.id, gearIcon(x), x.g, S.gear.own[x.id], { eq: S.gear.eq[x.slot] === x.id, isNew: newIds.has(x.id) })).join('')}</div>
     <div style="height:2rem"></div>`;
-  sc.querySelector('#slUp').onclick = () => { if (slimeLevelUp(id)) { sfx('levelup'); toast(`${sl.name} NV ${S.slimes.own[id].lv}!`, 'arrowUp'); } else { sfx('nogold'); toast('Fragmentos insuficientes.', 'slime'); } };
+  sc.querySelector('#hLook').onclick = () => { sfx('tap'); openCreator(false); };
+  sc.querySelector('#hReset').onclick = () => { const n = resetPoints(); sfx(n ? 'levelup' : 'tap'); toast(n ? `${n} pontos devolvidos` : 'Nenhum ponto gasto', 'star'); };
+  sc.querySelectorAll('[data-pt]').forEach(b => b.onclick = () => {
+    const r = spendPoint(b.dataset.pt);
+    if (r === 'ok') sfx('levelup');
+    else { sfx('nogold'); toast(r === 'pts' ? 'Sem pontos. Suba de nível derrotando inimigos.' : r === 'locked' ? 'Ainda bloqueado.' : 'Nível máximo.', 'star'); }
+  });
   sc.querySelector('#gAuto').onclick = () => { sfx('tap'); autoEquipGear(); toast('Melhores equipamentos equipados', 'check'); };
   sc.querySelector('#gFuse').onclick = () => { const n = fuseAll(S.gear.own); sfx(n ? 'levelup' : 'nogold'); toast(n ? `${n} equipamentos melhorados` : 'Nada para fundir', 'arrowUp'); };
   sc.querySelectorAll('[data-slot]').forEach(b => b.onclick = () => {
@@ -112,8 +115,47 @@ function tabSlime(sc) {
     if (!isOpen('gear')) { sfx('nogold'); toast(`Desbloqueia na Missão ${UNLOCK.gear}`, 'lock'); return; }
     sfx('tap'); gearPicker(slot);
   });
-  sc.querySelectorAll('[data-sl]').forEach(b => b.onclick = () => { sfx('tap'); slimeDetail(b.dataset.sl); });
   sc.querySelectorAll('#gGrid .card').forEach(b => b.onclick = () => { sfx('tap'); gearDetail(b.dataset.id); });
+}
+
+// ------------------------------------------------------------------ Barco
+const PAS_N = { atk: 'ATQ', hp: 'PV', aspd: 'VATQ', gold: 'Ouro', rec: 'Recuperação de PV', crit: 'Chance de Crítico', cdmg: 'Dano Crítico' };
+const pasText = (s, lv) => Object.entries(s.pas).map(([k, v]) => `${PAS_N[k]} +${Math.round(v * shipMul(lv) * 100)}%`).join(' · ');
+function tabShip(sc) {
+  const cur = SHIP[S.ships.cur] || SHIP.bote, lv = S.ships.own[cur.id] || 1;
+  const cost = shipUpCost(cur, lv);
+  sc.innerHTML = `
+    <div class="panelx" style="padding:0;overflow:hidden">
+      <div style="position:relative;height:15rem;background:linear-gradient(#8fd8ff,#c8f0ff 62%,#3fa8e0 62%,#1f5fa8)">
+        <div style="position:absolute;left:50%;bottom:.6rem;width:${17 * cur.size + 4}rem;transform:translateX(-50%);animation:bob 2.6s ease-in-out infinite">${shipSVG(cur)}</div>
+      </div>
+      <div style="padding:1rem 1.2rem">
+        <div style="display:flex;align-items:center;gap:.8rem"><span class="gr f-num ol-s" style="background:${RANK_COLS[cur.r]};padding:.1rem .8rem;border-radius:.8rem;border:.2rem solid var(--ol);font-size:1.2rem">${RANK_NAMES[cur.r]}</span><span class="f-num ol" style="font-size:2.2rem">${cur.name}</span><span class="f-num ol-s" style="margin-left:auto;font-size:1.6rem">NV ${lv}</span></div>
+        <div style="font-size:1.3rem;color:var(--txt3);margin:.4rem 0 .8rem">${cur.lore}</div>
+        <div class="kv"><span>Bônus</span><b class="ol-s" style="font-size:1.35rem;text-align:right">${pasText(cur, lv)}</b></div>
+        <div class="passive" style="flex-direction:column;align-items:flex-start;gap:.2rem;text-align:left"><span class="f-num ol-s" style="color:#ffe680;font-size:1.5rem">${cur.ab.name}</span><span style="color:var(--txt2);font-size:1.3rem">${cur.ab.desc}${cur.ab.pct || cur.ab.shield ? ` <span style="color:#9dff7a">(força x${shipMul(lv).toFixed(2).replace('.', ',')})</span>` : ''}</span></div>
+        <div class="btnrow"><button class="btn ol-s" id="shUp"${lv >= SHIP_MAX ? ' disabled' : ''}>${ico('arrowUp')}${lv >= SHIP_MAX ? 'Nível máximo' : `Melhorar ${ico('coin')}${fmt(cost)}`}</button></div>
+      </div>
+    </div>
+    <div class="sec">Frota</div>
+    ${SHIPS.map(sh => {
+      const own = S.ships.own[sh.id], here = sh.id === cur.id;
+      return `<button class="shiprow${own ? '' : ' locked'}${here ? ' on' : ''}" data-sh="${sh.id}">
+        <div class="sa">${shipSVG(sh)}</div>
+        <div class="st"><div><b class="f-num ol-s" style="font-size:1.6rem">${sh.name}</b> <span style="color:${RANK_COLS[sh.r]};font-size:1.2rem" class="f-num ol-s">${RANK_NAMES[sh.r]}</span></div>
+          <div style="font-size:1.2rem;color:var(--txt3)">${own ? `NV ${own} · ${pasText(sh, own)}` : `Chega na fase ${sh.stage}`}</div>
+          <div style="font-size:1.2rem;color:var(--txt2)">${sh.ab.name}</div></div>
+        <span class="sb f-num ol-s">${here ? 'Em uso' : own ? 'Usar' : ico('lock')}</span></button>`;
+    }).join('')}
+    <div style="height:2rem"></div>`;
+  const up = sc.querySelector('#shUp');
+  up.onclick = () => { const r = shipUpgrade(cur.id); if (r === 'ok') sfx('levelup'); else { sfx('nogold'); if (r === 'gold') toast('Ouro insuficiente.', 'coin'); } };
+  sc.querySelectorAll('[data-sh]').forEach(b => b.onclick = () => {
+    const sh = SHIP[b.dataset.sh];
+    if (!S.ships.own[sh.id]) { sfx('nogold'); toast(`${sh.name} chega na fase ${sh.stage}.`, 'lock'); return; }
+    if (sh.id === cur.id) { sfx('tap'); return; }
+    setShip(sh.id); sfx('levelup'); toast(`Zarpando no ${sh.name}!`, 'ship');
+  });
 }
 
 function gearPicker(slot) {
@@ -137,20 +179,6 @@ function gearDetail(id) {
   modal({ title: SLOT[it.slot].name, body: detail({ art: gearIcon(it), g: it.g, name: it.name, lv: own && own.lv, cp: own ? own.cp : 0, need: own ? fuseNeed(own.lv) : 0,
     stats: [[`Efeito equipado (${nm[eqv.stat]})`, `+${fmt(eqv.v)}%${own ? ` → +${fmt(nextE.v)}%` : ''}`], [`Efeito passivo (${nm[pv.stat]})`, `+${fmt(pv.v)}%${own ? ` → +${fmt(nextP.v)}%` : ''}`]],
     desc: own ? 'Os atributos aumentam ao fundir cópias.' : 'Ainda não obtido. Invoque Equipamentos na Loja.' }), buttons: b });
-}
-
-function slimeDetail(id) {
-  const s = SLIME[id], o = S.slimes.own[id];
-  const src = { start: 'Seu primeiro companheiro de reino.', raid: 'Obtida em Incursões.', mine: 'Encontrada na Mina.', boss: 'Recompensa do Rei Toupeira.', shop: 'À venda na Loja.' };
-  const from = s.from.startsWith('stage:') ? `Chega ao alcançar a fase ${s.from.split(':')[1]}.` : src[s.from];
-  const btns = [];
-  if (o) {
-    if (S.slimes.cur !== id) btns.push({ label: 'Usar', cls: 'blue', onClick: () => { setSlime(id); sfx('levelup'); toast(`${s.name} entrou na batalha!`, 'slime'); } });
-    btns.push({ label: 'Melhorar', cls: 'purple', onClick: () => { if (slimeLevelUp(id)) { sfx('levelup'); } else { sfx('nogold'); toast('Fragmentos insuficientes.', 'slime'); return false; } } });
-  } else btns.push({ label: 'Fechar', cls: 'gray' });
-  modal({ title: 'Gosma', body: detail({ art: slimeArt(id, o ? 'happy' : 'idle'), g: [0, 4, 6, 7][s.r], name: s.name, lv: o && o.lv, cp: o ? o.cp : 0, need: o ? slimeNeed(o.lv) : 0,
-    gradeLabel: `<span class="gr f-num ol-s" style="background:${RANK_COL[s.r]}">Rank ${RANKS[s.r]}</span>`,
-    desc: `<b>${s.ability.name}:</b> ${s.ability.desc}<br><b>Única (NV ${UNIQUE_LV}) — ${s.unique.name}:</b> ${s.unique.desc}<br><span style="color:var(--txt3)">${o ? `Bônus de coleção: ATQ e PV +${fmt(slimeBase(s.r, o.lv))}%` : from}</span>` }), buttons: btns });
 }
 
 // ------------------------------------------------------------------ Habilidade
@@ -227,7 +255,7 @@ function petDetail(id) {
     btns.push({ label: 'Fundir', cls: 'purple', onClick: () => { if (fuseItem(S.pets.own, id)) { sfx('levelup'); } else { sfx('nogold'); toast('Cópias insuficientes.', 'arrowUp'); return false; } } });
   } else btns.push({ label: 'Fechar', cls: 'gray' });
   modal({ title: 'Companheiro', body: detail({ art: petSVG(p), g: p.g, name: p.name, lv: o && o.lv, cp: o ? o.cp : 0, need: o ? fuseNeed(o.lv) : 0,
-    desc: p.kind === 'ranged' ? 'Ataca à distância com projéteis.' : 'Luta corpo a corpo ao lado da gosma.',
+    desc: `<b style="color:${p.ult.col}">ULT — ${p.ult.name}</b> (a cada ${p.ult.cd} s): ${ultDesc(p, lv)}`,
     stats: [['ATQ', fmt(ST.atk * petAtk(p, lv))], ['VATQ', fmtDec(petSpd(p, lv), 2)], ['Efeito passivo (ATQ)', `+${fmt(Math.round(petPassive(p, lv)))}%`]] }), buttons: btns });
 }
 
@@ -267,13 +295,14 @@ function tabStats(sc) {
   const rows = [
     ['sword', 'ATQ', fmt(ST.atk)], ['heart', 'PV', fmt(ST.hp)], ['regen', 'Recuperação de PV', fmtS(ST.rec) + '/s'], ['speed', 'VATQ', fmtDec(ST.aspd, 2)],
     ['crit', 'Chance de Crítico', fmtPct(ST.crit)], ['burst', 'Dano Crítico', fmtPct(ST.cdmg, 0)], ['double', 'Ataque Duplo', fmtPct(ST.dbl)], ['triple', 'Ataque Triplo', fmtPct(ST.trp)],
-    ['bossdmg', 'Dano em Chefes', fmtPct(ST.boss, 0)], ['gold', 'Ouro obtido', fmtPct(ST.gold, 0)], ['book', 'Dano de habilidades', fmtPct(ST.skill, 0)], ['clock', 'Redução de recarga', fmtPct(ST.cdr, 0)],
+    ['bossdmg', 'Dano em Chefes', fmtPct(ST.boss, 0)], ['heart', 'Redução de dano', fmtPct(ST.def)], ['speed', 'Esquiva', fmtPct(ST.dodge)], ['gold', 'Ouro obtido', fmtPct(ST.gold, 0)], ['book', 'Dano de habilidades', fmtPct(ST.skill, 0)], ['clock', 'Redução de recarga', fmtPct(ST.cdr, 0)],
     ['power', 'Poder', fmt(ST.power)],
   ];
   const src = [
     ['Coleção de habilidades', 'ATQ ' + pct(b.skills || 0)], ['Coleção de companheiros', 'ATQ ' + pct(b.pets || 0)],
     ['Equipamentos (passivo)', `ATQ ${pct(b.gearAtk || 0)} · PV ${pct(b.gearHp || 0)}`], ['Equipamentos (equipados)', `ATQ ${pct(b.eqAtk || 0)} · PV ${pct(b.eqHp || 0)}`],
-    ['Coleção de gosmas', `ATQ ${pct((b.slimeAtk || 0))} · PV ${pct(b.slimeHp || 0)}`], ['Relíquias', `ATQ ${pct(g(b.relic, 'atk'))} · PV ${pct(g(b.relic, 'hp'))}`],
+    ['Nível do capitão', `ATQ ${pct(b.lvAtk || 0)} · PV ${pct(b.lvHp || 0)}`], ['Treino', `ATQ ${pct(g(b.train, 'atk'))} · PV ${pct(g(b.train, 'hp'))}`],
+    ['Barco', `ATQ ${pct(g(b.ship, 'atk'))} · PV ${pct(g(b.ship, 'hp'))}`], ['Haki do Armamento', `Dano ${pct(ST.armDmg || 0)}`], ['Relíquias', `ATQ ${pct(g(b.relic, 'atk'))} · PV ${pct(g(b.relic, 'hp'))}`],
     ['Tesouros', `ATQ ${pct(g(b.treasure, 'atk'))} · PV ${pct(g(b.treasure, 'hp'))}`], ['Talentos', `ATQ ${pct(g(b.talent, 'atk'))} · PV ${pct(g(b.talent, 'hp'))}`],
   ];
   sc.innerHTML = `<div class="sec">Atributos finais</div>${rows.map(([i, k, v]) => `<div class="kv"><span style="display:flex;align-items:center;gap:.8rem"><span style="width:2.6rem;height:2.6rem">${icon(i)}</span>${k}</span><b class="ol-s">${v}</b></div>`).join('')}

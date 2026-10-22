@@ -9,7 +9,6 @@ import { gstyle } from '../cards.js';
 import * as BAL from '../../data/balance.js';
 import { TALENTS, TALENT, talentCost } from '../../data/talents.js';
 import { TREASURE } from '../../data/relics.js';
-import { SLIME } from '../../data/slimes.js';
 import { ST } from '../../game/stats.js';
 import { B } from '../../game/battle.js';
 import { startRaid, startRush, maxRaidLevel, RUSH_TIERS, RUSH_REWARD, rushRef, RAID_TIME } from '../../game/modes.js';
@@ -17,7 +16,7 @@ import { COLS, tile, isDug, tileDmg, canDig, dig, regenPicks, nextPickIn, PICK_M
 import { canRebirth, rebirthGain, doRebirth, buyTalent } from '../../game/rebirth.js';
 import { biomeLayers, BIOMES } from '../../art/scenery.js';
 import { buildingSVG, moleParts } from '../../art/enemies.js';
-import { slimeParts } from '../../art/slime.js';
+import { avatarSVG } from '../../art/avatar.js';
 import { treasureIcon, relicIcon } from '../../art/items.js';
 import { icon } from '../../art/icons.js';
 
@@ -37,7 +36,7 @@ registerScreen('raid', {
         <div style="height:12rem;position:relative;background:linear-gradient(${b.sky[0]},${b.sky[2]})">
           <div style="position:absolute;left:0;right:0;bottom:1.4rem;height:9rem;background-image:url('data:image/svg+xml;utf8,${encodeURIComponent(biomeLayers('village').mid)}');background-size:auto 100%;background-repeat:repeat-x"></div>
           <div style="position:absolute;left:0;right:0;bottom:0;height:1.6rem;background:${b.ground[1]}"></div>
-          <div style="position:absolute;left:1.2rem;bottom:.6rem;width:6rem;height:5.6rem;animation:bob 1.4s ease-in-out infinite">${slimeParts({ color: SLIME[S.slimes.cur].color, hat: SLIME[S.slimes.cur].hat }).full('attack')}</div>
+          <div style="position:absolute;left:1.2rem;bottom:.6rem;width:6rem;height:5.6rem;animation:bob 1.4s ease-in-out infinite">${avatarSVG(S.hero.look)}</div>
           <div style="position:absolute;right:1.4rem;bottom:.2rem;width:9rem;height:9.8rem">${buildingSVG('prefeitura', 0)}</div>
         </div>
         <div style="padding:1rem 1.2rem;font-size:1.35rem;color:var(--txt2)">Destrua as 5 construções da vila em ${RAID_TIME} s. Cada uma dá <b style="color:#c8a0ff">pó de relíquia</b>, e a Prefeitura guarda um <b style="color:#ffe680">baú com uma relíquia</b>. Chaves: 3 por dia.</div>
@@ -71,7 +70,7 @@ registerScreen('rush', {
           <div class="kv" style="margin:0"><span>Recorde</span><b class="ol-s">${fmt(S.bossBest || 0)}</b></div></div>
       </div>
       <div class="sec">Recompensas por dano</div>
-      ${RUSH_TIERS.map((m, i) => `<div class="kv"><span>${fmt(m * ref)}+</span><b class="ol-s" style="display:flex;gap:.8rem;align-items:center;font-size:1.4rem"><span style="display:flex;align-items:center;gap:.2rem"><span style="width:2rem;height:2rem">${icon('gem')}</span>${RUSH_REWARD.gems[i + 1]}</span><span style="display:flex;align-items:center;gap:.2rem"><span style="width:2rem;height:2rem">${icon('pickaxe')}</span>${RUSH_REWARD.picks[i + 1]}</span>${i >= 2 ? `<span style="width:2rem;height:2rem">${icon('slime')}</span>` : ''}</b></div>`).join('')}
+      ${RUSH_TIERS.map((m, i) => `<div class="kv"><span>${fmt(m * ref)}+</span><b class="ol-s" style="display:flex;gap:.8rem;align-items:center;font-size:1.4rem"><span style="display:flex;align-items:center;gap:.2rem"><span style="width:2rem;height:2rem">${icon('gem')}</span>${RUSH_REWARD.gems[i + 1]}</span><span style="display:flex;align-items:center;gap:.2rem"><span style="width:2rem;height:2rem">${icon('pickaxe')}</span>${RUSH_REWARD.picks[i + 1]}</span></b></div>`).join('')}
       <div class="btnrow"><button class="btn red ol-s" id="rushGo">${ico('boss')}Desafiar (${S.tickets})</button></div><div style="height:2rem"></div></div>`;
     body.querySelector('#rushGo').onclick = () => {
       if (busy()) { toast('Termine a batalha atual primeiro.', 'info'); return; }
@@ -117,9 +116,8 @@ registerScreen('mine', {
       b.animate([{ transform: 'translateX(-3px)' }, { transform: 'translateX(3px)' }, { transform: 'none' }], { duration: 120 });
       if (res.broke) {
         for (const l of res.loot) {
-          if (l.k === 'treasure') { const t = TREASURE[l.id]; sfx('rare'); modal({ title: 'Tesouro encontrado!', body: `<div class="det"><div class="big" style="${gstyle(4)}">${treasureIcon(t)}</div><div class="nm f-num ol">${t.name}</div><div class="desc">Bônus permanente adicionado. Veja em Gosma › Relíquia.</div></div>` }); }
+          if (l.k === 'treasure') { const t = TREASURE[l.id]; sfx('rare'); modal({ title: 'Tesouro encontrado!', body: `<div class="det"><div class="big" style="${gstyle(4)}">${treasureIcon(t)}</div><div class="nm f-num ol">${t.name}</div><div class="desc">Bônus permanente adicionado. Veja em Pirata › Relíquia.</div></div>` }); }
           else if (l.k === 'bomb') { sfx('boom'); toast('Bomba! Blocos ao redor explodiram.', 'burst'); }
-          else if (l.k === 'slime') { sfx('gem'); toast(`Fragmento de ${SLIME[l.id].name}!`, 'slime'); }
           else { sfx(l.k === 'gem' ? 'gem' : 'coin'); toast(`+${fmt(l.v)} ${{ gold: 'ouro', gem: 'gemas', dust: 'pó de relíquia', picks: 'picaretas' }[l.k]}`, ITEM_ICON[l.k]); }
         }
         setTimeout(() => { if (screenOpen() === 'mine') rerender(); }, 120);
@@ -142,7 +140,7 @@ registerScreen('rebirth', {
     body.innerHTML = head('rebirth', 'Renascer', chip('essence', fmtInt(S.essence))) + `<div class="scr-scroll">
       <div class="panelx" style="margin-top:0;text-align:center;background:linear-gradient(#6a3ab0,#3a1f70)">
         <div style="width:9rem;height:9rem;margin:0 auto">${icon('rebirth')}</div>
-        <p style="font-size:1.4rem;color:#ecdcff;margin:.6rem 0">Volte à fase 1 com seus atributos zerados e ganhe <b style="color:#fff">Essência</b>. Habilidades, equipamentos, companheiros, gosmas e relíquias continuam com você.</p>
+        <p style="font-size:1.4rem;color:#ecdcff;margin:.6rem 0">Volte à fase 1 com seus atributos zerados e ganhe <b style="color:#fff">Essência</b>. Habilidades, equipamentos, companheiros, barcos, nível do capitão e relíquias continuam com você.</p>
         <div class="kv"><span>Fase máxima desta jornada</span><b class="ol-s">${S.maxStage}</b></div>
         <div class="kv"><span>Essência ao renascer</span><b class="ol-s" style="color:#e0b0ff">+${fmtInt(gain)}</b></div>
         <button class="btn purple ol-s" id="rbGo" style="margin-top:.8rem"${canRebirth() ? '' : ' disabled'}>${ico('rebirth')}${canRebirth() ? 'Renascer' : `Chegue à fase ${BAL.REBIRTH_STAGE}`}</button>
@@ -177,7 +175,7 @@ on('modeEnd', res => {
       ${res.relic ? `<div class="kv"><span style="display:flex;align-items:center;gap:.6rem"><span style="width:3rem;height:3rem">${relicIcon(res.relic)}</span>${res.relic.name}</span><b class="ol-s">${res.relicNew ? 'NOVA!' : '+10 pó'}</b></div>` : ''}
       ${res.gems ? `<div class="kv"><span>1ª vitória 3★</span><b class="ol-s">+${res.gems} gemas</b></div>` : ''}
       ${res.slime ? `<div class="kv"><span>Fragmentos</span><b class="ol-s">${res.slime.name}</b></div>` : ''}
-      ${res.why === 'dead' ? '<p style="color:#ff9aaa">Sua gosma foi derrotada.</p>' : res.why === 'time' ? '<p>O tempo acabou.</p>' : ''}` });
+      ${res.why === 'dead' ? '<p style="color:#ff9aaa">Seu capitão foi derrotado.</p>' : res.why === 'time' ? '<p>O tempo acabou.</p>' : ''}` });
   } else if (res.mode === 'rush') {
     sfx(res.tier ? 'victory' : 'defeat');
     modal({ title: 'Rei Toupeira', body: `<div class="f-num ol" style="font-size:3.2rem;color:#ffe14a">${fmt(res.score)}</div><p style="margin:0 0 .8rem">de dano${res.best ? ' — <b style="color:#9dff7a">novo recorde!</b>' : ''}</p>

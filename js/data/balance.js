@@ -84,7 +84,7 @@ export const UP = Object.fromEntries(UPGRADES.map(u => [u.k, u]));
 
 // ---------------- power ----------------
 export function power(st) {
-  return 2 * st.atk * (1 + st.crit * (st.cdmg - 1)) * (1 + st.dbl + st.trp) * Math.max(1, st.aspd) + st.hp;
+  return 2 * st.atk * (1 + st.crit * (st.cdmg - 1)) * (1 + st.dbl + st.trp) * Math.max(1, st.aspd) + st.hp / (1 - (st.def || 0)) / (1 - (st.dodge || 0));
 }
 
 // ---------------- grades ----------------

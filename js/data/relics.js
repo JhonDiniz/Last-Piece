@@ -22,7 +22,7 @@ export const relicCost = lv => 5 + lv * 5;     // dust to level up
 const TSHAPES = ['coin', 'gem', 'skull', 'fossil', 'idol', 'map'];
 const TCOLS = ['#ffcc3a', '#4cc9f0', '#ff7aa8', '#7ed957'];
 const TNAMES = [
-  'Moeda Antiga', 'Geodo Azul', 'Crânio de Cristal', 'Fóssil de Gosma', 'Ídolo de Ouro', 'Mapa Rasgado',
+  'Moeda Antiga', 'Geodo Azul', 'Crânio de Cristal', 'Fóssil Marinho', 'Ídolo de Ouro', 'Mapa Rasgado',
   'Dobrão Real', 'Safira Bruta', 'Máscara de Jade', 'Concha Fossilizada', 'Ídolo de Jade', 'Mapa Estelar',
   'Moeda Lunar', 'Rubi Bruto', 'Crânio Rosa', 'Âmbar com Inseto', 'Ídolo Rubro', 'Carta Náutica',
   'Medalha do Rei', 'Esmeralda Viva', 'Crânio Dourado', 'Ovo Petrificado', 'Ídolo Primordial', 'Mapa do Fim do Mundo',

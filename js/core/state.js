@@ -6,7 +6,7 @@ const VERSION = 1;
 
 export function defaults() {
   return {
-    v: VERSION, created: Date.now(), last: Date.now(), name: 'Rei Gelatino',
+    v: VERSION, created: Date.now(), last: Date.now(), name: 'Capitão',
     gold: 80, gems: 100, essence: 0,
     stage: 1, maxStage: 1, peak: 1, farm: false,
     up: { atk: 1, hp: 1, rec: 1, aspd: 1, crit: 1, cdmg: 1, dbl: 1, trp: 1, boss: 1 },
@@ -14,7 +14,8 @@ export function defaults() {
     skills: { own: {}, eq: [null, null, null, null, null, null], auto: false },
     gear: { own: {}, eq: { weapon: null, armor: null, ring: null, amulet: null } },
     pets: { own: {}, eq: [null, null, null, null, null] },
-    slimes: { own: { gelatino: { lv: 1, cp: 0 } }, cur: 'gelatino' },
+    hero: { created: false, look: null, lv: 1, xp: 0, pts: 0, train: { str: 0, res: 0, agi: 0, acc: 0, vit: 0 }, haki: { obs: 0, arm: 0, king: 0 } },
+    ships: { own: { bote: 1 }, cur: 'bote' },
     relics: {}, relicDust: 0, treasures: {},
     summon: { skill: { lv: 1, n: 0 }, gear: { lv: 1, n: 0 }, pet: { lv: 1, n: 0 } },
     daily: { day: today(), free: { skill: 3, gear: 3, pet: 3 }, raid: 3, boss: 2, shopFree: 1, login: 0 },

@@ -11,7 +11,6 @@ import { canFuse } from '../game/skills.js';
 import { canRebirth } from '../game/rebirth.js';
 import { PICK_MAX, regenPicks } from '../game/mine.js';
 import { resetDaily } from '../game/gacha.js';
-import { slimeCanLevel } from '../game/collection.js';
 import { $, ico, el, modal, toast, flyIcons } from './dom.js';
 import { DOTS, refreshNav } from './nav.js';
 import { openScreen, screenOpen } from './screens.js';
@@ -48,11 +47,11 @@ export function buildSide() {
   DOTS.rush = () => S.tickets > 0;
   DOTS.mine = () => { regenPicks(); return S.picks >= PICK_MAX; };
   DOTS.rebirth = () => canRebirth();
-  for (const ev of ['collection', 'summoned', 'market', 'daily', 'stage', 'modeEnd', 'mine', 'rebirth', 'slime', 'gear', 'pets', 'skills']) on(ev, () => refreshNav());
+  for (const ev of ['collection', 'summoned', 'market', 'daily', 'stage', 'modeEnd', 'mine', 'rebirth', 'hero', 'levelUp', 'gear', 'pets', 'skills']) on(ev, () => refreshNav());
 }
 function anyFusable() {
   for (const col of [S.skills.own, S.gear.own, S.pets.own]) for (const id in col) if (canFuse(col[id])) return true;
-  for (const id in S.slimes.own) if (slimeCanLevel(id)) return true;
+  if (S.hero.pts > 0) return true;
   return false;
 }
 function tickSide() {

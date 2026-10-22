@@ -3,8 +3,8 @@ import { S } from '../core/state.js';
 import { on } from '../core/bus.js';
 import { fmt, fmtClock, fmtGem } from '../core/util.js';
 import { B, W, world, challengeBoss } from '../game/battle.js';
-import { slimeParts } from '../art/slime.js';
-import { SLIME } from '../data/slimes.js';
+import { avatarSVG } from '../art/avatar.js';
+import { xpNeed } from '../data/hero.js';
 import { B as BALCFG } from '../data/balance.js';
 const BAL_waves = () => BALCFG.waves;
 import { $, ico, el, toast } from './dom.js';
@@ -12,13 +12,13 @@ import { sfx } from '../core/audio.js';
 import { openScreen } from './screens.js';
 import { view } from '../render/scene.js';
 
-let shownGold = 0, shownGems = 0, gp, gv, mp, mv, fill, bar, ticks, tm, chal, turbo, turboT, avatarPic, badge, ribbonT;
+let lvBadge, xpFill, shownGold = 0, shownGems = 0, gp, gv, mp, mv, fill, bar, ticks, tm, chal, turbo, turboT, avatarPic, badge, ribbonT;
 
 export function buildHud() {
   const hud = $('#hud');
   hud.innerHTML = `
     <div class="hrow">
-      <button class="avatar" id="avatar" aria-label="Perfil"><div class="pic" id="avatarPic"></div><div class="badge f-num ol-s">${ico('flag')}<span id="stageBadge">1</span></div></button>
+      <button class="avatar" id="avatar" aria-label="Perfil"><div class="pic" id="avatarPic"></div><div class="badge f-num ol-s">${ico('flag')}<span id="stageBadge">1</span></div><span class="lvb f-num ol-s" id="lvBadge">1</span><i class="xpb"><i id="xpFill"></i></i></button>
       <div class="pill gold" id="goldPill">${ico('coin')}<span class="v f-num ol-s" id="goldV">0</span></div>
       <div class="pill gems" id="gemPill">${ico('gem')}<span class="v f-num ol-s" id="gemV">0</span><button class="add" id="gemAdd" aria-label="Loja">${ico('plus')}</button></div>
       <div class="spacer"></div>
@@ -27,10 +27,10 @@ export function buildHud() {
     </div>
     <div class="banner"><div class="ribbon"><button class="mapb" id="mapBtn" aria-label="Mapa">${ico('map')}</button><span class="t f-num ol-s" id="stageName">Bosque Esmeralda 1-1</span></div></div>
     <div class="prog" id="prog"><div class="fill" id="progFill"></div><div id="ticks"></div><span class="clock hide" id="progClock">${ico('clock')}</span><span class="tm f-num ol-s hide" id="progTm"></span><div class="bossi">${ico('skull')}</div></div>
-    <button class="challenge f-num ol-s hide" id="challenge">Desafiar chefe</button>`;
+    <button class="challenge f-num ol-s hide" id="challenge">${ico('skull')}Desafiar chefe</button>`;
   gp = $('#goldPill'); gv = $('#goldV'); mp = $('#gemPill'); mv = $('#gemV');
   fill = $('#progFill'); bar = $('#prog'); ticks = $('#ticks'); tm = $('#progTm'); chal = $('#challenge');
-  turbo = $('#turbo'); turboT = $('#turboT'); avatarPic = $('#avatarPic'); badge = $('#stageBadge'); ribbonT = $('#stageName');
+  turbo = $('#turbo'); turboT = $('#turboT'); avatarPic = $('#avatarPic'); lvBadge = $('#lvBadge'); xpFill = $('#xpFill'); badge = $('#stageBadge'); ribbonT = $('#stageName');
   shownGold = S.gold; shownGems = S.gems;
   drawTicks();
   refreshAvatar();
@@ -49,15 +49,17 @@ export function buildHud() {
   on('phase', p => { refreshStage(); });
   on('modeStart', () => refreshStage());
   on('bossFail', () => { chal.classList.remove('hide'); toast('O chefe escapou! Fique mais forte e desafie de novo.', 'skull'); });
-  on('slime', refreshAvatar);
+  on('look', refreshAvatar);
+  on('levelUp', refreshAvatar);
+  on('farmLoop', () => { refreshStage(); toast('Você foi derrotado! A fase vai se repetir até você desafiar o chefe.', 'skull'); });
   on('dropArrive', k => { const p = k === 'gem' ? mp : gp; p.classList.remove('pulse'); void p.offsetWidth; p.classList.add('pulse'); sfx(k === 'gem' ? 'gem' : 'coin'); });
   refreshStage();
   measure();
 }
 
 export function refreshAvatar() {
-  const sl = SLIME[S.slimes.cur] || SLIME.gelatino;
-  avatarPic.innerHTML = slimeParts({ color: sl.color, hat: sl.hat }).full('idle');
+  avatarPic.innerHTML = avatarSVG(S.hero.look);
+  lvBadge.textContent = S.hero.lv;
 }
 
 function drawTicks() {
@@ -109,6 +111,7 @@ export function updateHud(dt) {
     const p = B.phase === 'victory' || B.phase === 'bossIntro' ? 1 : B.kills / B.total;
     fill.style.width = `calc(${(p * 100).toFixed(1)}% - ${p > 0 ? '.4rem' : '0rem'})`;
   }
+  xpFill.style.width = Math.min(100, S.hero.xp / xpNeed(S.hero.lv) * 100).toFixed(1) + '%';
   const tt = fmtClock(S.turbo.left);
   if (turboT.textContent !== tt) turboT.textContent = tt;
   turbo.classList.toggle('on', S.turbo.on && S.turbo.left > 0);

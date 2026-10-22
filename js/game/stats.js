@@ -4,11 +4,12 @@ import { UP, power } from '../data/balance.js';
 import { SKILL, skillPassive } from '../data/skills.js';
 import { GEAR_BY, gearEq, gearPas } from '../data/gear.js';
 import { PET, petPassive } from '../data/pets.js';
-import { SLIME, MILESTONES, MILESTONE_BONUS, UNIQUE_LV, slimeBase } from '../data/slimes.js';
+import { TRAIN, hakiDodge, lvAtk, lvHp } from '../data/hero.js';
+import { SHIP, shipMul } from '../data/ships.js';
 import { RELIC, TREASURE } from '../data/relics.js';
 import { TALENT } from '../data/talents.js';
 
-export const ST = { atk: 10, hp: 110, rec: 13.9, aspd: 1, crit: 0, cdmg: 1.2, dbl: 0, trp: 0, boss: 1, gold: 1, skill: 1, cdr: 0, slow: 0, offline: 1, gems: 1, discount: 0, power: 130 };
+export const ST = { def: 0, dodge: 0, armDmg: 0, atk: 10, hp: 110, rec: 13.9, aspd: 1, crit: 0, cdmg: 1.2, dbl: 0, trp: 0, boss: 1, gold: 1, skill: 1, cdr: 0, slow: 0, offline: 1, gems: 1, discount: 0, power: 130 };
 export const BONUS = {};       // breakdown for the attributes screen
 
 export function recompute() {
@@ -18,7 +19,7 @@ export function recompute() {
 
   // additive pools (fractions, 1 = +100%)
   const b = { skills: 0, pets: 0, gearAtk: 0, gearHp: 0, eqAtk: 0, eqHp: 0, eqCdmg: 0, eqGold: 0,
-    slimeAtk: 0, slimeHp: 0, relic: {}, treasure: {}, talent: {}, slime: {} };
+    relic: {}, treasure: {}, talent: {}, ship: {}, train: {} };
   for (const id in S.skills.own) { const o = S.skills.own[id]; if (SKILL[id] && o.lv > 0) b.skills += skillPassive(SKILL[id], o.lv) / 100; }
   for (const id in S.pets.own) { const o = S.pets.own[id]; if (PET[id] && o.lv > 0) b.pets += petPassive(PET[id], o.lv) / 100; }
   for (const id in S.gear.own) {
@@ -34,39 +35,33 @@ export function recompute() {
     else if (e.stat === 'cdmg') b.eqCdmg += e.v / 100; else if (e.stat === 'gold') b.eqGold += e.v / 100;
   }
   const add = (o, k, v) => { o[k] = (o[k] || 0) + v; };
-  for (const id in S.slimes.own) {
-    const o = S.slimes.own[id], sl = SLIME[id]; if (!sl || o.lv <= 0) continue;
-    const pct = slimeBase(sl.r, o.lv) / 100;
-    b.slimeAtk += pct; b.slimeHp += pct;
-    MILESTONES.forEach((m, i) => {
-      if (o.lv >= m) {
-        const mb = MILESTONE_BONUS[i], v = mb.v[sl.r];
-        if (mb.stat === 'all') { add(b.slime, 'atk', v); add(b.slime, 'hp', v); } else add(b.slime, mb.stat, v);
-      }
-    });
-  }
-  const cur = SLIME[S.slimes.cur];
-  if (cur) {
-    const lv = (S.slimes.own[cur.id] || {}).lv || 1;
-    if (cur.ability.passive) for (const k in cur.ability.passive) add(b.slime, k, cur.ability.passive[k]);
-    if (lv >= UNIQUE_LV) add(b.slime, cur.unique.stat, cur.unique.v);
-  }
+  // captain: level growth, training points and Haki
+  const H = S.hero, T = H.train, K = H.haki;
+  b.lvAtk = lvAtk(H.lv); b.lvHp = lvHp(H.lv);
+  b.train = { atk: T.str * TRAIN.str.per, hp: T.res * 0.03, aspd: T.agi * TRAIN.agi.per, crit: T.acc * TRAIN.acc.per, cdmg: T.acc * 0.02, rec: T.vit * TRAIN.vit.per };
+  // ship passives (current ship, scaled by its level)
+  const ship = SHIP[S.ships.cur];
+  if (ship) { const m = shipMul(S.ships.own[ship.id] || 1); for (const k in ship.pas) add(b.ship, k, ship.pas[k] * m); }
   for (const id in S.relics) { const r = RELIC[id], lv = S.relics[id]; if (r && lv > 0) add(b.relic, r.stat, r.per * lv); }
   for (const id in S.treasures) { const t = TREASURE[id]; if (t && S.treasures[id]) add(b.treasure, t.stat, t.v); }
   for (const id in S.rebirth.talents) { const t = TALENT[id], lv = S.rebirth.talents[id]; if (t && lv > 0) add(b.talent, t.stat, t.per * lv); }
 
   const g = (o, k) => o[k] || 0;
-  const extra = k => g(b.slime, k) + g(b.relic, k) + g(b.treasure, k) + g(b.talent, k);
+  const extra = k => g(b.ship, k) + g(b.relic, k) + g(b.treasure, k) + g(b.talent, k) + g(b.train, k);
 
-  ST.atk = base.atk * (1 + b.skills) * (1 + b.pets) * (1 + b.gearAtk) * (1 + b.eqAtk) * (1 + b.slimeAtk) * (1 + g(b.slime, 'atk')) * (1 + g(b.relic, 'atk')) * (1 + g(b.treasure, 'atk')) * (1 + g(b.talent, 'atk'));
-  ST.hp = base.hp * (1 + b.gearHp) * (1 + b.eqHp) * (1 + b.slimeHp) * (1 + g(b.slime, 'hp')) * (1 + g(b.relic, 'hp')) * (1 + g(b.treasure, 'hp')) * (1 + g(b.talent, 'hp'));
-  ST.rec = base.rec * (1 + extra('rec')) * (1 + b.slimeHp * 0.2);
+  ST.atk = base.atk * (1 + b.skills) * (1 + b.pets) * (1 + b.gearAtk) * (1 + b.eqAtk) * (1 + b.lvAtk) * (1 + g(b.train, 'atk')) * (1 + g(b.ship, 'atk')) * (1 + g(b.relic, 'atk')) * (1 + g(b.treasure, 'atk')) * (1 + g(b.talent, 'atk'));
+  ST.hp = base.hp * (1 + b.gearHp) * (1 + b.eqHp) * (1 + b.lvHp) * (1 + g(b.train, 'hp')) * (1 + g(b.ship, 'hp')) * (1 + g(b.relic, 'hp')) * (1 + g(b.treasure, 'hp')) * (1 + g(b.talent, 'hp'));
+  ST.rec = base.rec * (1 + extra('rec')) * (1 + b.lvHp * 0.2);
   ST.aspd = base.aspd * (1 + extra('aspd'));
   ST.crit = Math.min(1, base.crit + extra('crit'));
   ST.cdmg = base.cdmg + b.eqCdmg + extra('cdmg');
   ST.dbl = Math.min(1, base.dbl + extra('dbl'));
   ST.trp = Math.min(1, base.trp + extra('trp'));
-  ST.boss = base.boss;
+  ST.armDmg = K.arm * 0.06;
+  ST.atk *= 1 + ST.armDmg;
+  ST.boss = base.boss * (1 + K.arm * 0.04);
+  ST.def = Math.min(0.6, T.res * TRAIN.res.per);
+  ST.dodge = hakiDodge(K.obs);
   ST.gold = (1 + b.eqGold + extra('gold'));
   ST.skill = 1 + extra('skill');
   ST.cdr = Math.min(0.5, extra('cdr'));

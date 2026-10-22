@@ -8,7 +8,7 @@ import { sfx } from '../core/audio.js';
 import { openScreen, screenOpen, closeScreen } from './screens.js';
 
 const ITEMS = [
-  { k: 'slime', icon: 'slime', label: 'Gosma', open: () => true },
+  { k: 'slime', icon: 'pirate', label: 'Pirata', open: () => true },
   { k: 'raid', icon: 'raid', label: 'Incursão', open: () => isOpen('raid'), lock: `Missão ${UNLOCK.raid}` },
   { k: 'mine', icon: 'mine', label: 'Mina', open: () => isOpen('mine'), lock: `Missão ${UNLOCK.mine}` },
   { k: 'rush', icon: 'boss', label: 'Chefe', open: () => isOpen('rush'), lock: `Missão ${UNLOCK.rush}` },

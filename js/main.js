@@ -19,10 +19,15 @@ import { buildSide } from './ui/side.js';
 import { updateScreen } from './ui/screens.js';
 import { $, modal, ico, toast } from './ui/dom.js';
 import { biomeLayers, LAYER_H, STRIP } from './art/scenery.js';
-import { humanParts, ARCHETYPES, BOSSES, variant, EW, EH } from './art/enemies.js';
-import { slimeParts, SW, SH } from './art/slime.js';
-import { SLIME, SLIMES } from './data/slimes.js';
-import { giveSlimeFragments } from './game/collection.js';
+import { humanParts, EW, EH } from './art/enemies.js';
+import { shipSVG, SHIP_W, SHIP_H } from './art/ship.js';
+import { SHIP } from './data/ships.js';
+import { migrateSave } from './game/collection.js';
+import { checkShips } from './game/ship.js';
+import { heroSpec } from './render/scene.js';
+import { fx, text } from './game/battle.js';
+import './game/petsBattle.js';
+import { openCreator } from './ui/creator.js';
 import './ui/screens/index.js';
 
 const bootbar = $('#bootbar'), bootmsg = $('#bootmsg');
@@ -41,27 +46,25 @@ function layout() {
   const k = st.width / 390;
   const dockH = $('#dock').offsetHeight / k;
   world.feet = world.H - dockH + 4;
-  world.heroX = 92;
-  B.hero.x = 92;
+  world.heroX = 120;
+  B.hero.x = 120;
   measure();
 }
 
 async function preload() {
-  const sl = SLIME[S.slimes.cur] || SLIME.gelatino;
-  const hp = slimeParts({ color: sl.color, hat: sl.hat });
-  const k = $('#stage').getBoundingClientRect().width / 390;
+  const hp = humanParts(heroSpec());
+  const key = 'hero:' + Object.values(heroSpec()).join('|');
   const jobs = [];
-  const w = SW * 0.55, h = SH * 0.55;
-  jobs.push(spriteAsync('h:' + sl.id + ':body', hp.body, w, h));
-  for (const f of ['idle', 'blink', 'attack', 'hurt', 'happy']) jobs.push(spriteAsync('h:' + sl.id + ':f:' + f, hp.faces[f], w, h));
-  jobs.push(spriteAsync('h:' + sl.id + ':hat', hp.hat, w, h));
+  const w = EW * 0.6, h = EH * 0.6;
+  for (const n of ['legB', 'legF', 'body', 'arm']) jobs.push(spriteAsync(key + ':' + n, hp[n], w, h, { flash: true }));
+  const sh = SHIP[S.ships.cur] || SHIP.bote;
+  jobs.push(spriteAsync('ship:' + sh.id, shipSVG(sh), SHIP_W * sh.size, SHIP_H * sh.size));
   const r = B.info.region;
   const L = biomeLayers(r.bg);
   for (const n of ['far', 'mid', 'near', 'ground']) jobs.push(spriteAsync('bg:' + r.bg + ':' + n, L[n], STRIP, LAYER_H[n], { lowres: true }));
   let done = 0;
   const total = jobs.length;
   await Promise.all(jobs.map(p => Promise.resolve(p).then(() => step(0.35 + 0.6 * (++done / total)))));
-  void k; void EW; void EH;
 }
 
 function offlineGains() {
@@ -78,7 +81,7 @@ function offlineGains() {
   S.gems += gems;
   modal({
     title: 'Bem-vindo de volta!',
-    body: `<p>Sua gosma continuou lutando por <b style="color:#fff">${fmtTime(s)}</b>${secs > s ? ` (limite de ${capH} h)` : ''}.</p>
+    body: `<p>Seu bando continuou lutando por <b style="color:#fff">${fmtTime(s)}</b>${secs > s ? ` (limite de ${capH} h)` : ''}.</p>
       <div style="display:flex;justify-content:center;gap:1.6rem;font-size:2.2rem" class="f-num ol-s"><span style="display:flex;align-items:center;gap:.4rem"><span style="width:3.4rem;height:3.4rem">${ico('coin')}</span>+${fmt(gold)}</span>${gems ? `<span style="display:flex;align-items:center;gap:.4rem"><span style="width:3.4rem;height:3.4rem">${ico('gem')}</span>+${gems}</span>` : ''}</div>`,
     buttons: [{ label: 'Coletar', icon: 'check' }],
   });
@@ -92,7 +95,12 @@ function wire() {
   on('phase', p => {
     if (p === 'fight' || p === 'intro') { const tr = B.info.region.music; if (musicTrack() !== tr) playMusic(tr); }
   });
-  on('stage', () => { checkMission(); checkUnlocks(); stageGifts(); });
+  on('stage', () => { checkMission(); checkUnlocks(); checkShips(); });
+  on('levelUp', d => {
+    fx('lvup', B.hero.x, world.feet - 40, { life: 1.0, col: '#ffe14a' });
+    text(B.hero.x, world.feet - 120, `Nível ${d.lv}!`, '#ffe14a', 22, { life: 1.4, vy: -26 });
+    sfx('levelup');
+  });
   on('victory', () => { checkMission(); });
   on('gems', () => emit('dots'));
   setInterval(save, 10000);
@@ -105,13 +113,6 @@ function wire() {
     window.removeEventListener('pointerdown', first);
   };
   window.addEventListener('pointerdown', first);
-}
-
-function stageGifts() {
-  for (const sl of SLIMES) {
-    if (!sl.from.startsWith('stage:') || S.slimes.own[sl.id]) continue;
-    if (S.maxStage >= +sl.from.split(':')[1]) giveSlimeFragments(sl.id, 1);
-  }
 }
 
 let lastT = performance.now(), uiT = 0, frameSkip = 0;
@@ -135,8 +136,9 @@ function frame(t) {
 }
 
 async function boot() {
-  step(0.05, 'Carregando o reino…');
+  step(0.05, 'Içando as velas…');
   load();
+  migrateSave();
   silentUnlocks();
   recompute();
   try { await Promise.race([Promise.all([document.fonts.load('20px "Lilita One"'), document.fonts.load('900 20px Nunito')]), new Promise(r => setTimeout(r, 2500))]); } catch (e) { }
@@ -155,7 +157,9 @@ async function boot() {
   bootEl.style.opacity = '0';
   setTimeout(() => bootEl.remove(), 500);
   layout();
-  offlineGains();
+  checkShips();
+  if (!S.hero.created) openCreator(true);
+  else offlineGains();
   lastT = performance.now();
   requestAnimationFrame(frame);
   window.__RG = { S, B, ST, emit, recompute, startStage, castSkill };

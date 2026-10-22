@@ -11,22 +11,22 @@ import * as BAL from '../../data/balance.js';
 import { SKILLS, SKILL } from '../../data/skills.js';
 import { GEAR_BY } from '../../data/gear.js';
 import { PET, PETS } from '../../data/pets.js';
-import { SLIMES, SLIME } from '../../data/slimes.js';
+import { xpNeed } from '../../data/hero.js';
+import { gainXp } from '../../game/hero.js';
 import { skillIcon, gearIcon } from '../../art/items.js';
 import { petSVG } from '../../art/pets.js';
-import { slimeParts } from '../../art/slime.js';
+import { avatarSVG } from '../../art/avatar.js';
 import { icon } from '../../art/icons.js';
 import { BANNERS, summon, costOf, resetDaily } from '../../game/gacha.js';
 import { isOpen } from '../../game/progress.js';
 import { UNLOCK } from '../../data/missions.js';
 import { ST } from '../../game/stats.js';
-import { giveSlimeFragments } from '../../game/collection.js';
 import { CALM_TRACK, BOSS_TRACK } from '../../core/music.js';
 import { B } from '../../game/battle.js';
 
 let tab = 'Invocar', focus = null;
 const artOf = (type, id) => (type === 'skill' ? skillIcon(SKILL[id]) : type === 'pet' ? petSVG(PET[id]) : gearIcon(GEAR_BY[id]));
-const PREVIEW = { skill: ['meteoro', 'martelo', 'raio'], gear: ['weapon_4_0', 'armor_4_1', 'weapon_2_0'], pet: ['raposa', 'dragaozinho', 'gato'] };
+const PREVIEW = { skill: ['meteoro', 'martelo', 'raio'], gear: ['weapon_4_0', 'armor_4_1', 'weapon_2_0'], pet: ['zoro', 'luffy', 'nami'] };
 
 registerScreen('shop', {
   render(body, arg) {
@@ -44,7 +44,7 @@ registerScreen('shop', {
 on('summoned', () => { if (screenOpen() === 'shop') { const sc = $('#shScroll'); const y = sc ? sc.scrollTop : 0; rerender(); const n = $('#shScroll'); if (n) n.scrollTop = y; } });
 
 function renderSummon(sc) {
-  const mascot = slimeParts({ color: '#c55cff', hat: 'wizard' }).full('happy');
+  const mascot = avatarSVG(S.hero.look);
   const ban = type => {
     const b = BANNERS[type], st = S.summon[type], open = isOpen(b.feature);
     const req = summonReq(st.lv), max = st.lv >= SUMMON_MAX;
@@ -64,10 +64,10 @@ function renderSummon(sc) {
   sc.innerHTML = `<div class="portal"><div class="circle"><i></i></div><div class="mascot">${mascot}</div></div>
     <div class="passive" style="margin-top:-1rem;position:relative">Centro de Invocação · ${ico('gem')} <b style="color:#fff">${fmtInt(S.gems)}</b></div>
     <div class="banners">${ban('skill')}${ban('gear')}${ban('pet')}
-      <div class="ban" data-b="slimebox" style="--bc2:#4cc9f0;--bc:#2a7ab8">
-        <div class="bt f-num ol">${ico('slime')}Gosmas</div><span class="bl f-num ol-s">Baú de fragmentos</span>
-        <div class="pics"><div>${slimeParts({ color: '#ff8fb5', hat: 'wizard' }).full()}</div><div>${slimeParts({ color: '#c2c2d6', hat: 'astronaut' }).full('happy')}</div><div>${slimeParts({ color: '#9ad14b', hat: 'samurai' }).full()}</div></div>
-        <p style="margin:0;font-size:1.15rem;color:#e8f8ff;text-align:center">6 fragmentos de uma gosma aleatória</p>
+      <div class="ban" data-b="xpbox" style="--bc2:#4cc9f0;--bc:#2a7ab8">
+        <div class="bt f-num ol">${ico('star')}Treino</div><span class="bl f-num ol-s">Capitão NV ${S.hero.lv}</span>
+        <div class="pics"><div>${avatarSVG(S.hero.look)}</div></div>
+        <p style="margin:0;font-size:1.15rem;color:#e8f8ff;text-align:center">Treino intensivo: ganha 60% do XP do nível atual</p>
         <button class="btn gold ol-s" data-a="box" style="width:100%"><span class="c">${ico('gem')}300</span></button>
       </div>
     </div><div style="height:2rem"></div>`;
@@ -76,7 +76,7 @@ function renderSummon(sc) {
     bn.querySelectorAll('[data-a]').forEach(btn => btn.onclick = () => {
       const a = btn.dataset.a;
       if (a === 'info') { sfx('tap'); probTable(type); return; }
-      if (a === 'box') { buySlimeBox(btn); return; }
+      if (a === 'box') { buyTraining(); return; }
       doSummon(type, a === 'free' ? 11 : +a, a === 'free' ? 'free' : 'gems');
     });
   });
@@ -89,15 +89,14 @@ function probTable(type) {
     <p style="margin-top:1rem;font-size:1.25rem">Invoque mais para subir o nível e melhorar as chances.</p>` });
 }
 
-function buySlimeBox(btn) {
+function buyTraining() {
   if (S.gems < 300) { sfx('nogold'); toast('Gemas insuficientes.', 'gem'); return; }
-  const pool = SLIMES.filter(s => !s.from.startsWith('stage:') || S.slimes.own[s.id] || +s.from.split(':')[1] <= S.maxStage);
-  const s = pool[Math.floor(Math.random() * pool.length)];
   S.gems -= 300;
-  const fresh = giveSlimeFragments(s.id, 6);
+  const xp = Math.round(xpNeed(S.hero.lv) * 0.6);
+  gainXp(xp);
   save();
-  sfx(fresh ? 'rare' : 'reveal');
-  modal({ title: fresh ? 'Nova gosma!' : 'Fragmentos', body: `<div class="det"><div class="big" style="${gstyle(fresh ? 7 : 2)}">${slimeParts({ color: s.color, hat: s.hat }).full('happy')}</div><div class="nm f-num ol">${s.name}</div><div class="desc">${fresh ? 'Uma nova gosma se juntou ao reino! Equipe-a em Gosma › Minhas gosmas.' : '+6 fragmentos para melhorar esta gosma.'}</div></div>` });
+  sfx('levelup');
+  toast(`+${fmtInt(xp)} XP`, 'star');
   rerender();
 }
 

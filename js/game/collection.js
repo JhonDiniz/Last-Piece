@@ -3,7 +3,6 @@ import { S, save } from '../core/state.js';
 import { emit } from '../core/bus.js';
 import { GEAR, GEAR_BY, SLOTS, SLOT, gearEq } from '../data/gear.js';
 import { PET, PETS, PET_SLOTS } from '../data/pets.js';
-import { SLIME, SLIMES, slimeNeed, SLIME_MAX } from '../data/slimes.js';
 import { RELIC, RELIC_MAX, relicCost } from '../data/relics.js';
 import { recompute } from './stats.js';
 import { checkMission } from './progress.js';
@@ -47,33 +46,23 @@ export function autoEquipPets() {
   recompute(); emit('pets'); checkMission(); save();
 }
 
-export function setSlime(id) {
-  if (!S.slimes.own[id]) return false;
-  S.slimes.cur = id;
-  recompute(); emit('slime'); save();
-  return true;
-}
-export function slimeCanLevel(id) { const o = S.slimes.own[id]; return o && o.lv < SLIME_MAX && o.cp >= slimeNeed(o.lv); }
-export function slimeLevelUp(id) {
-  const o = S.slimes.own[id];
-  if (!slimeCanLevel(id)) return false;
-  o.cp -= slimeNeed(o.lv); o.lv++;
-  recompute(); emit('slime'); save();
-  return true;
-}
-// fragments for a slime; the slime is unlocked when it gets its first fragments
-export function giveSlimeFragments(id, n) {
-  if (!SLIME[id]) return false;
-  let fresh = false;
-  if (!S.slimes.own[id]) { S.slimes.own[id] = { lv: 1, cp: 0 }; fresh = true; n = Math.max(0, n - 1); }
-  S.slimes.own[id].cp += n;
-  recompute(); emit('slime');
-  if (fresh) emit('newSlime', id);
-  return fresh;
-}
-export function slimeForSource(src) {
-  const c = SLIMES.filter(s => s.from === src);
-  return c.length ? c[Math.floor(Math.random() * c.length)] : null;
+// drop data from older saves that no longer exists (old companions, slimes)
+const OLD_PET_GRADE = { pintinho: 0, gato: 0, morcego: 1, sapo: 1, raposa: 2, abelha: 2, coruja: 3, fantasma: 3, dragaozinho: 4, unicornio: 4, fenix: 5, golem: 5, polvo: 6, estrela: 6, leao: 7, baleia: 7 };
+export function migrateSave() {
+  // old companions become the crewmate of the same grade
+  for (const id in S.pets.own) {
+    if (PET[id]) continue;
+    const g = OLD_PET_GRADE[id], to = g !== undefined && PETS.find(p => p.g === g);
+    if (to) {
+      const o = S.pets.own[id], cur = S.pets.own[to.id];
+      S.pets.own[to.id] = cur ? { lv: Math.max(cur.lv, o.lv), cp: (cur.cp || 0) + (o.cp || 0) } : { lv: o.lv, cp: o.cp || 0 };
+      S.pets.eq = S.pets.eq.map(e => (e === id ? to.id : e));
+    }
+    delete S.pets.own[id];
+  }
+  S.pets.eq = S.pets.eq.map((id, i, a) => (a.indexOf(id) === i ? id : null));
+  S.pets.eq = S.pets.eq.map(id => (id && PET[id] && S.pets.own[id] ? id : null));
+  delete S.slimes;
 }
 
 export function relicLevelUp(id) {

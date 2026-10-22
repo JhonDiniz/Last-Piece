@@ -6,12 +6,13 @@ import { ST } from './stats.js';
 import * as BAL from '../data/balance.js';
 import { stageInfo } from '../data/regions.js';
 import { ARCHETYPES, BOSSES } from '../art/enemies.js';
-import { SLIME } from '../data/slimes.js';
+import { gainXp } from './hero.js';
+import { enemyXp, bossXp } from '../data/hero.js';
 
 export const W = 390;
-export const world = { H: 456, feet: 330, heroX: 92, gold: { x: 120, y: 30 }, gems: { x: 220, y: 30 }, shake: 0, flash: 0 };
+export const world = { H: 456, feet: 330, heroX: 120, shore: 194, gold: { x: 120, y: 30 }, gems: { x: 220, y: 30 }, shake: 0, flash: 0 };
 
-const hero = { x: 92, hp: 110, max: 110, shield: 0, atkT: 0.5, anim: 0, animLen: 0.28, hitDone: true, hurtT: 0, blinkT: 2, face: 'idle', walk: 0, buffs: [], revived: false, abilityT: 0, victory: 0, dead: 0, squash: 0, lv: 0 };
+const hero = { x: 120, hp: 110, max: 110, shield: 0, atkT: 0.5, anim: 0, animLen: 0.28, hitDone: true, hurtT: 0, blinkT: 2, face: 'idle', walk: 0, buffs: [], revived: false, abilityT: 0, victory: 0, dead: 0, squash: 0, lv: 0 };
 export const B = {
   hero, enemies: [], projs: [], drops: [], texts: [], fx: [], clones: [],
   phase: 'intro', pt: 0, g: 1, info: stageInfo(1), kills: 0, total: BAL.stageKills(), queue: [], spawnT: 0,
@@ -19,6 +20,8 @@ export const B = {
   mode: 'stage', bg: null, onKill: null, modeUpdate: null, onHeroDeath: null,
 };
 let uid = 0;
+// the ship rocks gently; the captain and the crew ride it
+export const shipBob = () => Math.sin(B.time * 1.6) * 2.2;
 
 // ------------------------------------------------------------------ helpers
 export function heroAtk() {
@@ -122,6 +125,7 @@ function kill(e) {
   if (B.mode !== 'stage') { if (e.building) { e.vx = 0; e.vy = 0; } S.stats.kills++; if (B.onKill) B.onKill(e); emit('kill', e); return; }
   const gold = e.gold * ST.gold;
   S.gold += gold;
+  gainXp(e.boss ? bossXp(B.g) : enemyXp(B.g));
   S.stats.kills++;
   const n = e.boss ? 14 : 4;
   for (let i = 0; i < n; i++) drop('coin', e.x, world.feet - 40 * e.scale, gold / n);
@@ -151,23 +155,19 @@ function drop(kind, x, y, value) {
 
 export function damageHero(d) {
   if (hero.dead) return;
+  if (ST.dodge > 0 && Math.random() < ST.dodge) { text(hero.x, world.feet - 84, 'Esquivou!', '#7ee0ff', 16, { vy: -40 }); fx('dodge', hero.x, world.feet - 40, { life: 0.35 }); return; }
+  d *= 1 - ST.def;
   if (hero.shield > 0) { const a = Math.min(hero.shield, d); hero.shield -= a; d -= a; fx('shieldHit', hero.x, world.feet - 40); }
   if (d <= 0) return;
   hero.hp -= d;
   hero.hurtT = 0.25;
   text(hero.x, world.feet - 80, '-' + BAL_fmt(d), '#ff6b8a', 17, { vy: -38 });
   if (hero.hp <= 0) {
-    const sl = SLIME[S.slimes.cur];
-    if (sl && sl.ability.revive && !hero.revived) {
-      hero.revived = true; hero.hp = hero.max * sl.ability.revive;
-      fx('revive', hero.x, world.feet - 40, { life: 0.9 }); text(hero.x, world.feet - 100, 'Bênção!', '#ffe680', 22);
-      return;
-    }
     hero.hp = 0; hero.dead = 1;
     S.stats.deaths++;
     if (B.mode !== 'stage') { if (B.onHeroDeath) B.onHeroDeath(); return; }
     setPhase('defeat');
-    emit('defeat');
+    emit('defeat', { boss: !!B.boss });
   }
 }
 
@@ -179,7 +179,6 @@ export function update(dt) {
   const regenMul = B.phase === 'victory' || B.phase === 'intro' ? 6 : 1;
   if (!hero.dead) hero.hp = Math.min(hero.max, hero.hp + ST.rec * dt * regenMul);
   updateBuffs(dt);
-  updateAbility(dt);
 
   if (B.mode !== 'stage') { if (B.modeUpdate) B.modeUpdate(dt); }
   else switch (B.phase) {
@@ -241,8 +240,11 @@ export function update(dt) {
       if (B.pt > 2.0) {
         hero.dead = 0; hero.hp = hero.max;
         hero.shield = 0; hero.buffs.length = 0;
+        // only the captain has HP: after a defeat the same stage repeats without
+        // the boss until the player taps "Desafiar chefe"
         S.farm = true;
-        startStage(Math.max(1, B.g - (B.g > 1 ? 1 : 0)), 'intro');
+        startStage(B.g, 'intro');
+        emit('farmLoop');
       }
       break;
   }
@@ -278,21 +280,6 @@ function updateBuffs(dt) {
 }
 export function addBuff(b) { hero.buffs.push(b); emit('buff', b); }
 
-function updateAbility(dt) {
-  const sl = SLIME[S.slimes.cur];
-  if (!sl || !sl.ability.every || hero.dead) return;
-  if (B.phase !== 'fight' && B.phase !== 'boss') return;
-  hero.abilityT += dt;
-  if (hero.abilityT < sl.ability.every) return;
-  hero.abilityT = 0;
-  const a = sl.ability;
-  if (a.buff) { addBuff(Object.assign({ t: a.dur, src: 'slime' }, a.buff)); fx('aura', hero.x, world.feet - 40, { life: 0.8, col: sl.color }); }
-  if (a.heal) { hero.hp = Math.min(hero.max, hero.hp + hero.max * a.heal); fx('heal', hero.x, world.feet - 40, { life: 0.8 }); text(hero.x, world.feet - 96, '+' + BAL_fmt(hero.max * a.heal), '#6fef8f', 17); }
-  if (a.bolt) { const e = front(); if (e) { B.projs.push({ kind: 'bolt', from: 'hero', x: hero.x + 20, y: world.feet - 50, tx: e, v: 520, dmg: heroAtk() * a.bolt / 100 }); } }
-  if (a.nova) { fx('flames', W / 2, world.feet - 20, { life: 0.7 }); for (const e of alive()) hitEnemy(e, heroAtk() * a.nova / 100 * ST.skill, { col: '#ff9a3a' }); }
-  emit('ability', a);
-}
-
 function updateHero(dt) {
   hero.blinkT -= dt;
   if (hero.blinkT < -0.12) hero.blinkT = rand(2, 4.5);
@@ -322,11 +309,11 @@ function updateHero(dt) {
 function heroStrike() {
   const t = front();
   if (!t) return;
-  if (t.x - hero.x > 105) {
-    // too far for a body slam: spit a jelly ball instead
+  if (t.x - hero.x > 125) {
+    // too far for a sword swing: send a flying slash instead
     const [c, cd] = heroCrit();
     const crit = Math.random() < c;
-    B.projs.push({ kind: 'spit', from: 'hero', x: hero.x + 30, y: world.feet - 34, tx: t, v: 560, dmg: heroAtk() * (crit ? cd : 1), crit, col: '#9dff9a' });
+    B.projs.push({ kind: 'slash', from: 'hero', x: hero.x + 30, y: world.feet - 44, tx: t, v: 640, dmg: heroAtk() * (crit ? cd : 1), crit, col: '#e8f4ff' });
     hero.squash = 0.6;
     emit('heroSpit');
     return;
@@ -361,11 +348,13 @@ function updateEnemy(e, dt) {
   if (e.state === 'flee') { e.x += 140 * dt; return; }
   if (B.walking) e.x -= 70 * dt;
   if (hero.dead) { e.state = 'idle'; return; }
+  if (e.stunT > 0) { e.stunT -= dt; e.state = 'idle'; e.anim = 0; return; }
   // stop distance: melee next to the hero, ranged further back; keep a queue
   const sorted = alive().filter(o => o.state !== 'flee').sort((a, b) => a.x - b.x);
   const idx = sorted.indexOf(e);
   const prev = idx > 0 ? sorted[idx - 1] : null;
-  let stop = e.ranged ? hero.x + 175 : hero.x + 62 * (e.boss ? 1.25 : 1);
+  // enemies stay on the island: melee ones stop at the shore, in front of the ship
+  let stop = e.ranged ? hero.x + 175 : Math.max(world.shore + 14 * (e.boss ? 1.4 : 1), hero.x + 62);
   const prevM = sorted.slice(0, idx).reverse().find(o => o.ranged === e.ranged);
   if (prevM) stop = Math.max(stop, prevM.x + (prevM.boss ? 64 : 40));
   if (e.x > stop + 1) {
@@ -373,7 +362,7 @@ function updateEnemy(e, dt) {
     e.x = Math.max(stop, e.x - e.spd * slowMul * dt);
   } else {
     if (e.state === 'walk') e.state = 'idle';
-    const canHit = e.ranged || e.x - hero.x < 120;
+    const canHit = e.ranged || e.x - hero.x < 140;
     e.atkT -= dt * slowMul;
     if (e.anim > 0) {
       const before = e.anim;

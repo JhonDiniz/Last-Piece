@@ -4,7 +4,6 @@ import { emit } from '../core/bus.js';
 import * as BAL from '../data/balance.js';
 import { TREASURES } from '../data/relics.js';
 import { recompute, ST } from './stats.js';
-import { giveSlimeFragments, slimeForSource } from './collection.js';
 import { checkMission } from './progress.js';
 
 export const COLS = 6, PICK_MAX = 20, PICK_SECS = 600;
@@ -31,7 +30,7 @@ export function tile(r, c) {
   const hp = kind === 'dirt' ? 1 : kind === 'stone' ? 2 : 3;
   let item = null;
   if (v < 0.11) item = 'gold'; else if (v < 0.14) item = 'gem'; else if (v < 0.18) item = 'dust';
-  else if (v < 0.19) item = 'slime'; else if (v < 0.215) item = 'bomb'; else if (v < 0.235) item = 'picks';
+  else if (v < 0.19) item = 'gem'; else if (v < 0.215) item = 'bomb'; else if (v < 0.235) item = 'picks';
   const t = TREASURES.find(x => x.depth === r && Math.floor(hash(r, 7, m.seed) * COLS) === c);
   if (t) return { hp: 3, kind: 'rock', item: 'treasure', tid: t.id };
   return { hp, kind, item };
@@ -68,7 +67,6 @@ function open(r, c, out) {
     case 'gem': { const v = 5 + Math.floor(r / 10) * 2; S.gems += v; out.push({ k: 'gem', v }); break; }
     case 'dust': { const v = 2 + Math.floor(r / 15); S.relicDust += v; out.push({ k: 'dust', v }); break; }
     case 'picks': { S.picks += 3; out.push({ k: 'picks', v: 3 }); break; }
-    case 'slime': { const sl = slimeForSource('mine'); if (sl) { giveSlimeFragments(sl.id, 1); out.push({ k: 'slime', v: 1, id: sl.id }); } break; }
     case 'treasure': { if (!S.treasures[t.tid]) { S.treasures[t.tid] = 1; out.push({ k: 'treasure', id: t.tid }); } break; }
     case 'bomb': {
       out.push({ k: 'bomb' });
@@ -95,7 +93,7 @@ export function dig(r, c) {
   // keep the save small: forget rows far above the frontier
   const cut = m.depth - 14;
   if (cut > 0) for (const k in m.dug) if (+k.split(',')[0] < cut) delete m.dug[k];
-  if (loot.some(l => l.k === 'treasure' || l.k === 'slime')) recompute();
+  if (loot.some(l => l.k === 'treasure')) recompute();
   save(); checkMission();
   emit('mine', { r, c, broke, loot });
   return { ok: true, broke, loot };

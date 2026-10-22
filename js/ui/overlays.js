@@ -3,12 +3,12 @@ import { S } from '../core/state.js';
 import { on } from '../core/bus.js';
 import { fmt } from '../core/util.js';
 import { B } from '../game/battle.js';
-import { slimeParts } from '../art/slime.js';
+import { avatarSVG } from '../art/avatar.js';
+import { shipSVG } from '../art/ship.js';
 import { humanParts, variant, moleParts } from '../art/enemies.js';
-import { SLIME } from '../data/slimes.js';
 import * as BAL from '../data/balance.js';
 import { $, el, ico, newContent, modal } from './dom.js';
-import { RANKS, RANK_COL } from '../data/slimes.js';
+import { HAKI } from '../data/hero.js';
 import { icon } from '../art/icons.js';
 import { sfx, playMusic } from '../core/audio.js';
 import { BOSS_TRACK } from '../core/music.js';
@@ -21,8 +21,7 @@ export function buildOverlays() {
     put(el(`<div class="titlecard"><span class="t1 f-num ol-s">${info.saga.name} · Fase ${info.short}</span><span class="t2 f-num ol">${info.stage.arc}</span><span class="t3 ol-s">${info.stage.terr}</span></div>`), 1800);
   });
   on('bossIntro', d => {
-    const sl = SLIME[S.slimes.cur] || SLIME.gelatino;
-    const heroS = slimeParts({ color: sl.color, hat: sl.hat }).full('attack');
+    const heroS = avatarSVG(S.hero.look);
     const boss = d.mole ? moleParts().full : humanParts(variant(d.spec, B.info.cycle - 1)).full;
     put(el(`<div class="vs"><div class="bgv"></div><div class="who l">${heroS}</div><div class="who r">${boss}</div><div class="word f-num ol">VS</div><div class="nm f-num ol">${d.spec.name}</div></div>`), 2100);
     sfx('bossIntro');
@@ -34,16 +33,20 @@ export function buildOverlays() {
     sfx('victory');
   });
   on('defeat', () => {
-    put(el(`<div class="defeat"><div class="w f-num ol">Derrota...</div><div class="s ol-s">Melhore seus atributos e tente de novo!</div></div>`), 2100);
+    put(el(`<div class="defeat"><div class="w f-num ol">Derrota...</div><div class="s ol-s">A fase vai se repetir. Fique mais forte e toque em <b>Desafiar chefe</b>.</div></div>`), 2100);
     sfx('defeat');
   });
   on('unlock', u => { newContent(u.name); sfx('unlock'); });
-  on('newSlime', id => {
-    const sl = SLIME[id];
+  on('newShip', sh => {
     sfx('rare');
-    modal({ title: 'Nova gosma obtida!', body: `<div class="det"><div class="big" style="--gc:#3a2a7a;--gc2:#7a4ad8;--gb:${RANK_COL[sl.r]};width:13rem;height:13rem">${slimeParts({ color: sl.color, hat: sl.hat }).full('happy')}</div>
-      <div class="nm f-num ol"><span style="color:${RANK_COL[sl.r]}">${RANKS[sl.r]}</span> ${sl.name}</div>
-      <div class="desc"><b>${sl.ability.name}:</b> ${sl.ability.desc}</div>
-      <div class="desc" style="font-size:1.25rem">Equipe em Gosma › Minhas gosmas.</div></div>` });
+    modal({ title: 'Novo barco!', body: `<div class="det"><div class="big" style="--gc:#2a6ab8;--gc2:#8fd8ff;--gb:#ffe680;width:15rem;height:13rem">${shipSVG(sh)}</div>
+      <div class="nm f-num ol">${sh.name}</div>
+      <div class="desc"><b>${sh.ab.name}:</b> ${sh.ab.desc}</div>
+      <div class="desc" style="font-size:1.25rem">Troque de barco em Pirata › Barco.</div></div>` });
+  });
+  on('hakiUnlock', h => {
+    sfx('unlock');
+    modal({ title: 'Haki despertado!', body: `<div class="det"><div class="big" style="--gc:#2a1a5a;--gc2:#5a3ab0;--gb:${h.col};width:12rem;height:12rem"><div style="width:70%;height:70%;margin:15%;border-radius:50%;background:radial-gradient(circle at 40% 35%, #fff, ${h.col} 45%, #2a1a3e)"></div></div>
+      <div class="nm f-num ol">${h.name}</div><div class="desc">Use pontos de treino para melhorá-lo em Pirata › Haki.</div></div>` });
   });
 }

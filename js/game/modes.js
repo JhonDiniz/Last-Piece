@@ -7,7 +7,7 @@ import { B, W, world, spawnCustom, startStage, text, fx, damageHero, resetHero }
 import { ARCHETYPES, BUILDING_NAMES } from '../art/enemies.js';
 import { RELICS } from '../data/relics.js';
 import { recompute, ST } from './stats.js';
-import { giveRelic, giveSlimeFragments, slimeForSource } from './collection.js';
+import { giveRelic } from './collection.js';
 import { checkMission } from './progress.js';
 import { clearSkillFx } from '../render/skillfx.js';
 
@@ -96,8 +96,6 @@ function endRaid(why) {
   if (stars === 3 && (S.raidBest || 0) < R.L) {
     S.raidBest = R.L;
     res.gems = 100 + 50 * R.L; S.gems += res.gems;
-    const sl = slimeForSource('raid');
-    if (sl) { giveSlimeFragments(sl.id, 3); res.slime = sl; }
   }
   S.stats.raids = (S.stats.raids || 0) + 1;
   recompute(); save(); checkMission();
@@ -138,7 +136,6 @@ function endRush(why) {
   RUSH_TIERS.forEach((m, i) => { if (score >= m * ref) tier = i + 1; });
   const res = { mode: 'rush', why, score, tier, gems: RUSH_REWARD.gems[tier], picks: RUSH_REWARD.picks[tier], slime: null, best: score > (S.bossBest || 0) };
   S.gems += res.gems; S.picks += res.picks;
-  if (tier >= 3) { const sl = slimeForSource('boss'); if (sl) { giveSlimeFragments(sl.id, 1 + tier); res.slime = sl; } }
   if (res.best) S.bossBest = score;
   S.stats.rush = (S.stats.rush || 0) + 1;
   for (const e of B.enemies) if (e.endless) e.state = 'flee';

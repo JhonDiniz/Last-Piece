@@ -6,10 +6,10 @@ import { sfx, applyVolumes, playMusic } from '../../core/audio.js';
 import { registerScreen, rerender, closeScreen, openScreen } from '../screens.js';
 import { $, ico, el, modal, toast } from '../dom.js';
 import { REGIONS, STAGES_PER_CYCLE, stageInfo } from '../../data/regions.js';
-import { SLIMES, SLIME } from '../../data/slimes.js';
+import { SHIP } from '../../data/ships.js';
 import { RELICS, TREASURES } from '../../data/relics.js';
 import { biomeLayers, BIOMES } from '../../art/scenery.js';
-import { slimeParts } from '../../art/slime.js';
+import { avatarSVG } from '../../art/avatar.js';
 import { icon } from '../../art/icons.js';
 import { ST } from '../../game/stats.js';
 import { B, startStage } from '../../game/battle.js';
@@ -65,8 +65,11 @@ function openSave() {
 
 function openHelp() {
   modal({ title: 'Como jogar', body: `<div style="text-align:left;font-size:1.35rem;line-height:1.5">
-    <p>${ico('sword')} A gosma luta sozinha. Use o ouro para <b style="color:#fff">Melhorar</b> ATQ, PV e outros atributos (segure o botão para comprar vários).</p>
-    <p>${ico('skull')} Derrote as ondas e o chefe de cada fase em 30 segundos. Se ele escapar, fique mais forte e toque em <b style="color:#fff">Desafiar chefe</b>.</p>
+    <p>${ico('pirate')} Seu capitão luta sozinho do convés do barco. Use o ouro para <b style="color:#fff">Melhorar</b> ATQ, PV e outros atributos (segure o botão para comprar vários).</p>
+    <p>${ico('star')} Derrotar inimigos dá XP. A cada nível você ganha pontos de treino para Força, Resistência, Agilidade, Precisão e Vitalidade, e mais tarde desperta o Haki.</p>
+    <p>${ico('ship')} Novos barcos chegam ao longo da jornada. Cada um dá bônus e tem uma habilidade especial.</p>
+    <p>${ico('paw')} Cada companheiro do bando solta sua ULT sozinho de tempos em tempos.</p>
+    <p>${ico('skull')} Só o capitão tem vida. Se ele cair, a fase se repete sem chefe; quando estiver pronto, toque em <b style="color:#fff">Desafiar chefe</b> no topo da tela. O chefe precisa cair em 30 segundos.</p>
     <p>${ico('gem')} Missões dão gemas. Use-as na Loja para invocar habilidades, equipamentos e companheiros.</p>
     <p>${ico('arrowUp')} Cópias repetidas fundem e aumentam o nível. Todo item possuído dá um bônus passivo, mesmo sem estar equipado.</p>
     <p>${ico('rebirth')} Na fase 50, renascer troca o progresso das fases por Essência, que compra talentos permanentes.</p></div>` });
@@ -76,15 +79,13 @@ function openHelp() {
 registerScreen('profile', {
   modal: true,
   open() {
-    const sl = SLIME[S.slimes.cur];
-    const lvSum = Object.values(S.slimes.own).reduce((a, o) => a + o.lv, 0);
     const info = stageInfo(S.stage);
-    const rows = [['Fase', `${info.label} (${S.stage})`], ['Fase máxima', S.maxStage], ['Suas gosmas', `${Object.keys(S.slimes.own).length}/${SLIMES.length}`], ['Nível acumulado das gosmas', lvSum],
+    const rows = [['Fase', `${info.label} (${S.stage})`], ['Fase máxima', S.maxStage], ['Nível do capitão', S.hero.lv], ['Barco', (SHIP[S.ships.cur] || SHIP.bote).name], ['Barcos na frota', Object.keys(S.ships.own).length],
       ['Relíquias descobertas', `${Object.keys(S.relics).length}/${RELICS.length}`], ['Tesouros descobertos', `${Object.keys(S.treasures).length}/${TREASURES.length}`],
       ['Profundidade da mina', `${S.mine.best || 0} m`], ['Recorde contra o Rei Toupeira', fmt(S.bossBest || 0)], ['Renascimentos', S.rebirth.n],
       ['Inimigos derrotados', fmt(S.stats.kills)], ['Chefes derrotados', fmt(S.stats.bosses)], ['Invocações', fmt(S.stats.summons)], ['Tempo de jogo', fmtTime(S.stats.play)]];
     const m = modal({ title: 'Minhas informações', body: `
-      <div style="display:flex;align-items:center;gap:1.2rem;margin-bottom:1rem"><div style="width:7.6rem;height:7.6rem;border-radius:1.6rem;border:.3rem solid var(--ol);background:linear-gradient(#7fe0ff,#3a9ae8);padding:.4rem;flex:none">${slimeParts({ color: sl.color, hat: sl.hat }).full('happy')}</div>
+      <div style="display:flex;align-items:center;gap:1.2rem;margin-bottom:1rem"><div style="width:7.6rem;height:7.6rem;border-radius:1.6rem;border:.3rem solid var(--ol);background:linear-gradient(#7fe0ff,#3a9ae8);padding:.4rem;flex:none">${avatarSVG(S.hero.look)}</div>
         <div style="flex:1;text-align:left"><input id="pfName" value="${S.name.replace(/"/g, '&quot;')}" maxlength="18" style="width:100%;height:3.6rem;border-radius:1rem;border:.25rem solid var(--ol);background:#1a1236;color:#fff;font:inherit;font-size:1.6rem;padding:0 1rem">
         <div class="f-num ol-s" style="display:flex;align-items:center;gap:.4rem;margin-top:.6rem;font-size:2rem"><span style="width:3rem;height:3rem">${icon('power')}</span>${fmt(ST.power)}</div></div></div>
       ${rows.map(([k, v]) => `<div class="kv"><span>${k}</span><b class="ol-s">${v}</b></div>`).join('')}`,
@@ -117,7 +118,7 @@ registerScreen('map', {
           <div style="height:9rem;position:relative;background:linear-gradient(${b.sky[0]},${b.sky[2]})">
             <div style="position:absolute;left:0;right:0;bottom:0;height:7rem;background-image:url('data:image/svg+xml;utf8,${encodeURIComponent(biomeLayers(r.bg).mid)}');background-size:auto 100%;background-repeat:repeat-x"></div>
             <div style="position:absolute;left:0;right:0;bottom:0;height:1.6rem;background:${b.ground[0]}"></div>
-            ${here ? `<div style="position:absolute;left:1rem;bottom:.6rem;width:5rem;height:4.6rem;animation:bob 1.6s ease-in-out infinite">${slimeParts({ color: SLIME[S.slimes.cur].color, hat: SLIME[S.slimes.cur].hat }).full('happy')}</div>` : ''}
+            ${here ? `<div style="position:absolute;left:1rem;bottom:.6rem;width:5rem;height:4.6rem;animation:bob 1.6s ease-in-out infinite">${avatarSVG(S.hero.look)}</div>` : ''}
           </div>
           <details ${here ? 'open' : ''} style="padding:1rem 1.2rem">
             <summary style="display:flex;align-items:center;gap:1rem;list-style:none;cursor:pointer">
