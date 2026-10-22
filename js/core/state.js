@@ -12,9 +12,9 @@ export function defaults() {
     up: { atk: 1, hp: 1, rec: 1, aspd: 1, crit: 1, cdmg: 1, dbl: 1, trp: 1, boss: 1 },
     mission: 1, mprog: {},                 // mission index and counters for event missions
     skills: { own: {}, eq: [null, null, null, null, null, null], auto: false },
-    gear: { own: {}, eq: { weapon: null, armor: null, ring: null, amulet: null } },
-    pets: { own: {}, eq: [null, null, null, null, null] },
-    hero: { created: false, look: null, lv: 1, xp: 0, pts: 0, train: { str: 0, res: 0, agi: 0, acc: 0, vit: 0 }, haki: { obs: 0, arm: 0, king: 0 } },
+    gear: { own: {}, eq: { weapon: null, cloak: null, hat: null, fruit: null } },
+    pets: { own: {}, eq: [null, null] },
+    hero: { created: false, look: null, lv: 1, xp: 0, pts: 0, tree: {} },
     ships: { own: { bote: 1 }, cur: 'bote' },
     relics: {}, relicDust: 0, treasures: {},
     summon: { skill: { lv: 1, n: 0 }, gear: { lv: 1, n: 0 }, pet: { lv: 1, n: 0 } },

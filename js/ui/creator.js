@@ -2,7 +2,7 @@
 import { S, save } from '../core/state.js';
 import { emit } from '../core/bus.js';
 import { sfx } from '../core/audio.js';
-import { LOOK_OPTS, LOOK_ORDER, defaultLook } from '../data/hero.js';
+import { LOOK_OPTS, LOOK_ORDER, normalizeLook } from '../data/hero.js';
 import { avatarSVG } from '../art/avatar.js';
 import { recompute } from '../game/stats.js';
 import { $, el, ico, toast } from './dom.js';
@@ -15,7 +15,7 @@ function randomLook() {
 }
 
 export function openCreator(first) {
-  const look = Object.assign(defaultLook(), S.hero.look || {});
+  const look = normalizeLook(S.hero.look);
   let name = S.hero.created ? S.name : '';
   const wrap = el(`<div class="creator"><div class="cr-head f-num ol">${first ? 'Crie seu pirata' : 'Editar visual'}</div>
     <div class="cr-top"><div class="cr-prev"><div class="cr-sea"></div><div class="cr-av" id="crAv"></div></div>

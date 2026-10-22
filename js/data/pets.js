@@ -34,4 +34,4 @@ export const petPassive = (p, lv) => PAS[p.g] * (1 + 0.248 * (lv - 1));     // %
 export const ultPct = (p, lv) => Math.round((p.ult.pct || 0) * (1 + 0.15 * (lv - 1)));
 export const ultDesc = (p, lv) => p.ult.desc.replace('{p}', ultPct(p, lv));
 // companion slots open with progress
-export const PET_SLOTS = [0, 30, 60, 100, 150];   // max stage needed (0 = when the feature opens)
+export const PET_SLOTS = [0, 40];   // max stage needed (0 = when the feature opens); the deck fits two crewmates

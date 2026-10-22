@@ -10,7 +10,8 @@ import { GRADES, fuseNeed } from '../../data/balance.js';
 import { SKILLS, SKILL, skillPassive, skillDmg } from '../../data/skills.js';
 import { GEAR, GEAR_BY, SLOTS, SLOT, gearEq, gearPas } from '../../data/gear.js';
 import { PETS, PET, petAtk, petSpd, petPassive, PET_SLOTS, ultDesc } from '../../data/pets.js';
-import { TRAINING, HAKI, xpNeed, LV_MAX } from '../../data/hero.js';
+import { xpNeed, LV_MAX } from '../../data/hero.js';
+import { TREES, NODE, nodeDesc } from '../../data/tree.js';
 import { SHIPS, SHIP, SHIP_MAX, shipMul, shipUpCost, RANK_NAMES, RANK_COLS } from '../../data/ships.js';
 import { RELICS, RELIC, TREASURES, RELIC_MAX, relicCost } from '../../data/relics.js';
 import { UPGRADES, UP } from '../../data/balance.js';
@@ -24,7 +25,7 @@ import { isOpen } from '../../game/progress.js';
 import { UNLOCK } from '../../data/missions.js';
 import { equipSkill, unequipSkill, autoEquipSkills, fuseAll, fuseItem, canFuse } from '../../game/skills.js';
 import { equipGear, unequipGear, autoEquipGear, gearSlotOpen, petSlotsOpen, equipPet, unequipPet, autoEquipPets, relicLevelUp } from '../../game/collection.js';
-import { spendPoint, resetPoints, hakiOpen } from '../../game/hero.js';
+import { spendPoint, resetPoints, nodeState, treeOpen, spentPoints, RESET_COST, heroLook } from '../../game/hero.js';
 import { setShip, shipUpgrade } from '../../game/ship.js';
 import { openCreator } from '../creator.js';
 
@@ -69,16 +70,12 @@ function tabPirate(sc) {
   const gearRow = SLOTS.map(slot => {
     const open = gearSlotOpen(slot.k), gid = S.gear.eq[slot.k], it = gid && GEAR_BY[gid];
     return `<button class="card${it ? '' : ' none'}" data-slot="${slot.k}" style="${it ? gstyle(it.g) : ''}">
-      <div class="art">${it ? gearIcon(it) : open ? `<div style="opacity:.5">${icon(slot.k === 'weapon' ? 'sword' : slot.k === 'armor' ? 'heart' : slot.k === 'ring' ? 'relic' : 'treasure')}</div>` : icon('lock')}</div>
+      <div class="art">${it ? gearIcon(it) : open ? `<div style="opacity:.5">${icon(slot.k === 'weapon' ? 'sword' : slot.k === 'cloak' ? 'cloak' : slot.k === 'hat' ? 'pirate' : 'fruit')}</div>` : icon('lock')}</div>
       <span class="nv f-num ol-s">${it ? 'NV' + S.gear.own[gid].lv : slot.name}</span>${!open ? `<div class="bar"><span class="f-num ol-s">Fase ${slot.unlock}</span></div>` : ''}</button>`;
   }).join('');
-  const row = (k, name, ic, col, p, max, desc, locked) => `<div class="trow${locked ? ' locked' : ''}">
-      <span class="ti" style="--c:${col}">${ic}</span>
-      <div class="tt"><div class="tn"><b class="f-num ol-s">${name}</b><span class="f-num ol-s">${locked ? '' : `${p}/${max}`}</span></div><div class="td">${desc}</div></div>
-      <button class="btn sm ol-s tplus" data-pt="${k}"${locked || H.pts <= 0 || p >= max ? ' disabled' : ''}>${locked ? ico('lock') : ico('plus')}</button></div>`;
   sc.innerHTML = `
     <div class="panelx" style="display:flex;gap:1.2rem;align-items:center;background:linear-gradient(#5fb3e6,#3a7ac0)">
-      <div style="width:12rem;height:13rem;flex:none;position:relative"><div style="position:absolute;left:1rem;right:1rem;bottom:.2rem;height:1.6rem;border-radius:50%;background:rgba(20,10,40,.3)"></div><div style="position:absolute;inset:0;animation:bob 2.2s ease-in-out infinite">${avatarSVG(H.look)}</div></div>
+      <div style="width:12rem;height:13rem;flex:none;position:relative"><div style="position:absolute;left:1rem;right:1rem;bottom:.2rem;height:1.6rem;border-radius:50%;background:rgba(20,10,40,.3)"></div><div style="position:absolute;inset:0;animation:bob 2.2s ease-in-out infinite">${avatarSVG(heroLook())}</div></div>
       <div style="flex:1;min-width:0">
         <div class="f-num ol" style="font-size:2.2rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${S.name}</div>
         <div class="f-num ol-s" style="font-size:1.6rem;margin:.3rem 0">Nível ${H.lv}${H.lv >= LV_MAX ? ' (máx.)' : ''}</div>
@@ -86,13 +83,8 @@ function tabPirate(sc) {
         <button class="btn sm purple ol-s" id="hLook" style="margin-top:.6rem;width:100%">${ico('user')}Editar visual</button>
       </div>
     </div>
-    <div class="passive" style="margin-top:1rem">${ico('star')} Pontos de treino: <b>${H.pts}</b> <span style="color:var(--txt3);font-size:1.2rem">(+1 por nível)</span></div>
-    <div class="sec">Treino</div>
-    ${TRAINING.map(t => row(t.k, t.name, icon(t.icon), t.col, H.train[t.k], t.max, t.desc(H.train[t.k]), false)).join('')}
-    <div class="sec">Haki</div>
-    ${HAKI.map(h => row(h.k, h.name, `<span style="display:block;width:100%;height:100%;border-radius:50%;background:radial-gradient(circle at 40% 35%, #fff, ${h.col} 45%, #2a1a3e)"></span>`, h.col, H.haki[h.k], h.max,
-      hakiOpen(h.k) ? h.desc(H.haki[h.k]) : `Libera no nível ${h.lv}`, !hakiOpen(h.k))).join('')}
-    <div class="btnrow"><button class="btn sm gray ol-s" id="hReset">${ico('rebirth')}Redistribuir pontos</button></div>
+    <div class="sec">Maestria</div>
+    ${treeView()}
     <div class="sec">Equipamento</div>
     <div class="grid g4">${gearRow}</div>
     <div class="btnrow"><button class="btn sm blue ol-s" id="gAuto">${ico('check')}Equipar melhor</button><button class="btn sm purple ol-s" id="gFuse">${ico('arrowUp')}Fundir tudo</button></div>
@@ -101,12 +93,7 @@ function tabPirate(sc) {
     <div class="grid" id="gGrid" style="margin-top:1rem">${GEAR.filter(x => gearSlotOpen(x.slot)).map(x => card(x.id, gearIcon(x), x.g, S.gear.own[x.id], { eq: S.gear.eq[x.slot] === x.id, isNew: newIds.has(x.id) })).join('')}</div>
     <div style="height:2rem"></div>`;
   sc.querySelector('#hLook').onclick = () => { sfx('tap'); openCreator(false); };
-  sc.querySelector('#hReset').onclick = () => { const n = resetPoints(); sfx(n ? 'levelup' : 'tap'); toast(n ? `${n} pontos devolvidos` : 'Nenhum ponto gasto', 'star'); };
-  sc.querySelectorAll('[data-pt]').forEach(b => b.onclick = () => {
-    const r = spendPoint(b.dataset.pt);
-    if (r === 'ok') sfx('levelup');
-    else { sfx('nogold'); toast(r === 'pts' ? 'Sem pontos. Suba de nível derrotando inimigos.' : r === 'locked' ? 'Ainda bloqueado.' : 'Nível máximo.', 'star'); }
-  });
+  wireTree(sc);
   sc.querySelector('#gAuto').onclick = () => { sfx('tap'); autoEquipGear(); toast('Melhores equipamentos equipados', 'check'); };
   sc.querySelector('#gFuse').onclick = () => { const n = fuseAll(S.gear.own); sfx(n ? 'levelup' : 'nogold'); toast(n ? `${n} equipamentos melhorados` : 'Nada para fundir', 'arrowUp'); };
   sc.querySelectorAll('[data-slot]').forEach(b => b.onclick = () => {
@@ -116,6 +103,53 @@ function tabPirate(sc) {
     sfx('tap'); gearPicker(slot);
   });
   sc.querySelectorAll('#gGrid .card').forEach(b => b.onclick = () => { sfx('tap'); gearDetail(b.dataset.id); });
+}
+
+// mastery tree: pentagon nodes joined by lines, one tree per tab
+let treeTab = 'base', selNode = 'forca';
+const ROW_H = 8.2;
+function nodeIcon(n) {
+  if (n.haki) return `<span class="horb" style="--c:${n.haki}"></span>`;
+  return icon(n.icon);
+}
+function treeView() {
+  const H = S.hero, t = TREES.find(x => x.k === treeTab), rows = Math.max(...t.nodes.map(n => n.at[1])) + 1;
+  if (!NODE[selNode] || NODE[selNode].tree !== treeTab) selNode = t.nodes[0].id;
+  const cx = n => n.at[0] * 100 + 50, cy = n => n.at[1] * ROW_H * 10 + 40;
+  const lines = t.nodes.flatMap(n => (n.req || []).map(r => {
+    const a = NODE[r], on = nodeState(n.id).open;
+    return `<line x1="${cx(a)}" y1="${cy(a)}" x2="${cx(n)}" y2="${cy(n)}" stroke="${on ? '#ffe680' : '#5a4c8a'}" stroke-width="5" stroke-linecap="round"/>`;
+  })).join('');
+  const nodes = t.nodes.map(n => {
+    const st = nodeState(n.id), mx = st.p >= n.max;
+    return `<button class="tnode${mx ? ' max' : st.open ? ' open' : ' locked'}${selNode === n.id ? ' sel' : ''}" data-node="${n.id}" style="left:${n.at[0] * 33.333 + 16.666}%;top:${n.at[1] * ROW_H}rem">
+      ${mx ? '<span class="tmax f-num ol-s">Máximo</span>' : ''}<span class="tpent"><span class="ti">${st.open || mx ? nodeIcon(n) : icon('lock')}</span><span class="tp f-num ol-s">${st.p}/${n.max}</span></span></button>`;
+  }).join('');
+  const n = NODE[selNode], st = nodeState(n.id);
+  const now = st.p ? nodeDesc(n, st.p) : '—', next = st.p < n.max ? nodeDesc(n, st.p + 1) : null;
+  return `<div class="ttabs">${TREES.map(x => `<button class="tab f-num ol-s${x.k === treeTab ? ' on' : ''}${treeOpen(x.k) ? '' : ' locked'}" data-tt="${x.k}">${treeOpen(x.k) ? '' : ico('lock')}${x.name}</button>`).join('')}</div>
+    <div class="tree" style="height:${rows * ROW_H + 1.5}rem"><svg class="tlines" viewBox="0 0 300 ${rows * ROW_H * 10}" preserveAspectRatio="none">${lines}</svg>${nodes}</div>
+    <div class="tsp f-num ol-s"><span class="spb">SP</span> ${H.pts} <span style="color:var(--txt3)">/ ${H.pts + spentPoints()}</span></div>
+    <div class="tdet"><span class="tpent big ${st.p >= n.max ? 'max' : st.open ? 'open' : 'locked'}"><span class="ti">${nodeIcon(n)}</span><span class="tp f-num ol-s">${st.p}/${n.max}</span></span>
+      <div class="tdt"><b class="f-num ol-s">${n.name}</b><div>Atual: <b style="color:#9dff7a">${now}</b></div>${next ? `<div>Próximo: <b style="color:#ffe680">${next}</b></div>` : '<div style="color:#ffe680">Nível máximo</div>'}${st.open ? '' : `<div style="color:#ff9aaa">${st.why}</div>`}</div></div>
+    <div class="btnrow"><button class="btn ol-s" id="tUp"${st.open && st.p < n.max && H.pts > 0 ? '' : ' disabled'}>${ico('arrowUp')}Melhorar (1 SP)</button><button class="btn sm gray ol-s" id="tReset">${ico('rebirth')}Redefinir ${ico('gem')}${RESET_COST}</button></div>`;
+}
+function wireTree(sc) {
+  sc.querySelectorAll('[data-tt]').forEach(b => b.onclick = () => {
+    const k = b.dataset.tt;
+    if (!treeOpen(k)) { sfx('nogold'); toast(`A árvore de Haki libera no nível ${TREES.find(t => t.k === k).lv}.`, 'lock'); return; }
+    sfx('tap'); treeTab = k; selNode = TREES.find(t => t.k === k).nodes[0].id; refresh();
+  });
+  sc.querySelectorAll('[data-node]').forEach(b => b.onclick = () => { sfx('tap'); selNode = b.dataset.node; refresh(); });
+  sc.querySelector('#tUp').onclick = () => {
+    const r = spendPoint(selNode);
+    if (r === 'ok') sfx('levelup');
+    else { sfx('nogold'); toast(r === 'pts' ? 'Sem SP. Suba de nível derrotando inimigos.' : r === 'locked' ? nodeState(selNode).why : 'Nível máximo.', 'star'); }
+  };
+  sc.querySelector('#tReset').onclick = () => {
+    const n = resetPoints();
+    if (n > 0) { sfx('levelup'); toast(`${n} SP devolvidos`, 'star'); } else { sfx('nogold'); toast(n < 0 ? 'Gemas insuficientes.' : 'Nenhum ponto gasto.', n < 0 ? 'gem' : 'star'); }
+  };
 }
 
 // ------------------------------------------------------------------ Barco
@@ -169,7 +203,7 @@ function gearDetail(id) {
   const it = GEAR_BY[id], own = S.gear.own[id];
   const eqd = S.gear.eq[it.slot] === id;
   const eqv = gearEq(it, own ? own.lv : 1), pv = gearPas(it, own ? own.lv : 1);
-  const nm = { atk: 'ATQ', hp: 'PV', cdmg: 'Dano Crítico', gold: 'Ouro' };
+  const nm = { atk: 'ATQ', hp: 'PV', cdmg: 'Dano Crítico', gold: 'Ouro', skill: 'Dano de habilidades' };
   const nextE = gearEq(it, (own ? own.lv : 1) + 1), nextP = gearPas(it, (own ? own.lv : 1) + 1);
   const b = [];
   if (own) {
@@ -230,7 +264,7 @@ function tabPets(sc) {
   const total = Object.entries(S.pets.own).reduce((a, [id, o]) => a + (PET[id] ? petPassive(PET[id], o.lv) : 0), 0);
   sc.innerHTML = `
     <div class="panelx" style="background:linear-gradient(#8fd0ff,#5aa8e8);display:flex;justify-content:space-around;align-items:flex-end;height:11rem;padding-bottom:1.6rem">
-      ${[0, 1, 2, 3, 4].map(i => { const id = S.pets.eq[i]; const open = i < n; return `<button class="pslot" data-i="${i}" style="position:relative;width:5.6rem;height:5.6rem;${open ? '' : 'opacity:.55'}">
+      ${PET_SLOTS.map((_, i) => { const id = S.pets.eq[i]; const open = i < n; return `<button class="pslot" data-i="${i}" style="position:relative;width:5.6rem;height:5.6rem;${open ? '' : 'opacity:.55'}">
         <div style="position:absolute;left:.4rem;right:.4rem;bottom:-.4rem;height:1.4rem;border-radius:50%;background:rgba(20,10,40,.25)"></div>
         ${id ? `<div style="position:absolute;inset:0;animation:bob ${1.6 + i * .2}s ease-in-out infinite">${petSVG(PET[id])}</div>` : `<div style="position:absolute;inset:.6rem;border-radius:1.2rem;border:.25rem dashed rgba(255,255,255,.7);display:flex;align-items:center;justify-content:center;font-size:2.2rem">${open ? ico('plus') : ico('lock')}</div>`}
         ${!open ? `<span class="f-num ol-s" style="position:absolute;left:50%;bottom:-2rem;transform:translateX(-50%);font-size:1rem;white-space:nowrap">Fase ${PET_SLOTS[i]}</span>` : ''}</button>`; }).join('')}
@@ -301,7 +335,7 @@ function tabStats(sc) {
   const src = [
     ['Coleção de habilidades', 'ATQ ' + pct(b.skills || 0)], ['Coleção de companheiros', 'ATQ ' + pct(b.pets || 0)],
     ['Equipamentos (passivo)', `ATQ ${pct(b.gearAtk || 0)} · PV ${pct(b.gearHp || 0)}`], ['Equipamentos (equipados)', `ATQ ${pct(b.eqAtk || 0)} · PV ${pct(b.eqHp || 0)}`],
-    ['Nível do capitão', `ATQ ${pct(b.lvAtk || 0)} · PV ${pct(b.lvHp || 0)}`], ['Treino', `ATQ ${pct(g(b.train, 'atk'))} · PV ${pct(g(b.train, 'hp'))}`],
+    ['Nível do capitão', `ATQ ${pct(b.lvAtk || 0)} · PV ${pct(b.lvHp || 0)}`], ['Maestria', `ATQ ${pct(g(b.train, 'atk'))} · PV ${pct(g(b.train, 'hp'))}`],
     ['Barco', `ATQ ${pct(g(b.ship, 'atk'))} · PV ${pct(g(b.ship, 'hp'))}`], ['Haki do Armamento', `Dano ${pct(ST.armDmg || 0)}`], ['Relíquias', `ATQ ${pct(g(b.relic, 'atk'))} · PV ${pct(g(b.relic, 'hp'))}`],
     ['Tesouros', `ATQ ${pct(g(b.treasure, 'atk'))} · PV ${pct(g(b.treasure, 'hp'))}`], ['Talentos', `ATQ ${pct(g(b.talent, 'atk'))} · PV ${pct(g(b.talent, 'hp'))}`],
   ];

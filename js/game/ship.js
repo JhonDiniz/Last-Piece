@@ -2,9 +2,9 @@
 import { S, save } from '../core/state.js';
 import { emit } from '../core/bus.js';
 import { SHIP, SHIPS, SHIP_MAX, shipMul, shipUpCost, shipEarned } from '../data/ships.js';
-import { hakiKingEvery, hakiKingDmg } from '../data/hero.js';
+import { kingEvery, kingDmg } from '../data/tree.js';
 import { recompute, ST } from './stats.js';
-import { B, world, front, alive, hitEnemy, heroAtk, fx, text, addBuff, setExternalUpdate } from './battle.js';
+import { B, world, front, alive, hitEnemy, heroAtk, fx, text, addBuff, setExternalUpdate, gy } from './battle.js';
 
 // ---------------- ownership ----------------
 // ships are earned when the journey reaches their stage
@@ -38,38 +38,38 @@ export function shipUpgrade(id) {
 // ---------------- abilities ----------------
 let shipT = 0, kingT = 0;
 const fighting = () => B.phase === 'fight' || B.phase === 'boss' || (B.mode !== 'stage' && B.phase !== 'end');
-export const bowX = () => B.hero.x + 48;
+export const bowX = () => B.hero.x + 30;
 
 function fireShip() {
   const s = SHIP[S.ships.cur], a = s.ab, m = shipMul(S.ships.own[s.id] || 1);
   const dmg = heroAtk() * (a.pct || 0) / 100 * m * ST.skill;
-  text(B.hero.x, world.feet - 118, a.name + '!', '#ffe680', 18, { life: 1.2, vy: -26 });
+  text(B.hero.x, world.deckY - 118, a.name + '!', '#ffe680', 18, { life: 1.2, vy: -26 });
   emit('shipAbility', s);
   switch (a.kind) {
     case 'buff':
       addBuff(Object.assign({ t: a.dur, src: 'ship' }, a.buff));
-      fx('aura', B.hero.x, world.feet - 40, { life: 0.8, col: '#7ee0ff' });
-      if (a.pct) { const e = front(); if (e) B.projs.push({ kind: 'ball', from: 'hero', x: bowX(), y: world.feet - 20, tx: e, v: 520, dmg, col: '#ffcc3a' }); }
+      fx('aura', B.hero.x, world.deckY - 40, { life: 0.8, col: '#7ee0ff' });
+      if (a.pct) { const e = front(); if (e) B.projs.push({ kind: 'ball', from: 'hero', x: bowX(), y: world.deckY - 20, tx: e, v: 520, dmg, col: '#ffcc3a' }); }
       break;
     case 'shot': {
       const e = front();
-      fx('smoke', bowX(), world.feet - 18, { life: 0.6 });
-      if (e) B.projs.push({ kind: 'ball', from: 'hero', x: bowX(), y: world.feet - 18, tx: e, v: 520, dmg, col: '#ffcc3a' });
+      fx('smoke', bowX(), world.deckY - 18, { life: 0.6 });
+      if (e) B.projs.push({ kind: 'ball', from: 'hero', x: bowX(), y: world.deckY - 18, tx: e, v: 520, dmg, col: '#ffcc3a' });
       break;
     }
     case 'volley': {
-      fx('smoke', bowX(), world.feet - 18, { life: 0.6 });
-      fx('volley', 0, 0, { life: 1.0, hits: alive().map(e => e.x) });
+      fx('smoke', bowX(), world.deckY - 18, { life: 0.6 });
+      fx('volley', 0, 0, { life: 1.0, hits: alive().map(e => [e.x, gy(e)]) });
       setTimeout(() => { for (const e of alive()) hitEnemy(e, dmg, { col: '#ffb23f' }); world.shake = Math.max(world.shake, S.settings.shake ? 0.2 : 0); }, 350);
       break;
     }
     case 'guard':
       B.hero.shield = Math.max(B.hero.shield, B.hero.max * a.shield * m);
       B.hero.hp = Math.min(B.hero.max, B.hero.hp + B.hero.max * a.heal);
-      fx('heal', B.hero.x, world.feet - 40, { life: 0.8 });
+      fx('heal', B.hero.x, world.deckY - 40, { life: 0.8 });
       break;
     case 'stun':
-      fx('shock', B.hero.x, world.feet - 40, { life: 0.9, col: '#ff4f6a' });
+      fx('shock', B.hero.x, world.deckY - 40, { life: 0.9, col: '#ff4f6a' });
       for (const e of alive()) { e.stunT = Math.max(e.stunT || 0, a.stun); hitEnemy(e, dmg, { col: '#ff8a9a' }); }
       world.shake = Math.max(world.shake, S.settings.shake ? 0.25 : 0);
       break;
@@ -77,10 +77,10 @@ function fireShip() {
 }
 
 function fireKing() {
-  const p = S.hero.haki.king;
-  const dmg = heroAtk() * hakiKingDmg(p) / 100;
-  text(B.hero.x, world.feet - 128, 'Haki do Rei!', '#ffcc3a', 20, { life: 1.3, vy: -24 });
-  fx('shock', B.hero.x, world.feet - 40, { life: 1.0, col: '#ffcc3a' });
+  const T = S.hero.tree;
+  const dmg = heroAtk() * kingDmg(T.king || 0, T.coroa || 0) / 100;
+  text(B.hero.x, world.deckY - 128, 'Haki do Rei!', '#ffcc3a', 20, { life: 1.3, vy: -24 });
+  fx('shock', B.hero.x, world.deckY - 40, { life: 1.0, col: '#ffcc3a' });
   for (const e of alive()) { if (!e.boss) e.stunT = Math.max(e.stunT || 0, 2); hitEnemy(e, dmg, { col: '#ffe14a' }); }
   world.shake = Math.max(world.shake, S.settings.shake ? 0.25 : 0);
 }
@@ -91,8 +91,9 @@ setExternalUpdate(dt => {
   if (B.hero.dead || !fighting()) return;
   const s = SHIP[S.ships.cur];
   if (s) { shipT += dt; if (shipT >= s.ab.every && alive().length) { shipT = 0; fireShip(); } }
-  if (S.hero.haki.king > 0) {
+  const T = S.hero.tree;
+  if (T.king > 0) {
     kingT += dt;
-    if (kingT >= hakiKingEvery(S.hero.haki.king) && alive().length) { kingT = 0; fireKing(); }
+    if (kingT >= kingEvery(T.king, T.dominio || 0) && alive().length) { kingT = 0; fireKing(); }
   }
 });

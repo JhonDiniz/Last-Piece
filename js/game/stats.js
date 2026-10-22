@@ -4,7 +4,8 @@ import { UP, power } from '../data/balance.js';
 import { SKILL, skillPassive } from '../data/skills.js';
 import { GEAR_BY, gearEq, gearPas } from '../data/gear.js';
 import { PET, petPassive } from '../data/pets.js';
-import { TRAIN, hakiDodge, lvAtk, lvHp } from '../data/hero.js';
+import { lvAtk, lvHp } from '../data/hero.js';
+import { NODE } from '../data/tree.js';
 import { SHIP, shipMul } from '../data/ships.js';
 import { RELIC, TREASURE } from '../data/relics.js';
 import { TALENT } from '../data/talents.js';
@@ -18,7 +19,7 @@ export function recompute() {
   for (const k in UP) base[k] = UP[k].value(L[k] || 1);
 
   // additive pools (fractions, 1 = +100%)
-  const b = { skills: 0, pets: 0, gearAtk: 0, gearHp: 0, eqAtk: 0, eqHp: 0, eqCdmg: 0, eqGold: 0,
+  const b = { skills: 0, pets: 0, gearAtk: 0, gearHp: 0, eqAtk: 0, eqHp: 0, eqCdmg: 0, eqGold: 0, eqSkill: 0,
     relic: {}, treasure: {}, talent: {}, ship: {}, train: {} };
   for (const id in S.skills.own) { const o = S.skills.own[id]; if (SKILL[id] && o.lv > 0) b.skills += skillPassive(SKILL[id], o.lv) / 100; }
   for (const id in S.pets.own) { const o = S.pets.own[id]; if (PET[id] && o.lv > 0) b.pets += petPassive(PET[id], o.lv) / 100; }
@@ -32,13 +33,14 @@ export function recompute() {
     const id = S.gear.eq[slot]; if (!id || !S.gear.own[id]) continue;
     const e = gearEq(GEAR_BY[id], S.gear.own[id].lv);
     if (e.stat === 'atk') b.eqAtk += e.v / 100; else if (e.stat === 'hp') b.eqHp += e.v / 100;
-    else if (e.stat === 'cdmg') b.eqCdmg += e.v / 100; else if (e.stat === 'gold') b.eqGold += e.v / 100;
+    else if (e.stat === 'cdmg') b.eqCdmg += e.v / 100; else if (e.stat === 'gold') b.eqGold += e.v / 100; else if (e.stat === 'skill') b.eqSkill += e.v / 100;
   }
   const add = (o, k, v) => { o[k] = (o[k] || 0) + v; };
   // captain: level growth, training points and Haki
-  const H = S.hero, T = H.train, K = H.haki;
+  const H = S.hero;
   b.lvAtk = lvAtk(H.lv); b.lvHp = lvHp(H.lv);
-  b.train = { atk: T.str * TRAIN.str.per, hp: T.res * 0.03, aspd: T.agi * TRAIN.agi.per, crit: T.acc * TRAIN.acc.per, cdmg: T.acc * 0.02, rec: T.vit * TRAIN.vit.per };
+  // mastery tree nodes (b.train holds them, one pool per stat)
+  for (const id in H.tree) { const n = NODE[id]; if (n) add(b.train, n.stat, n.per * H.tree[id]); }
   // ship passives (current ship, scaled by its level)
   const ship = SHIP[S.ships.cur];
   if (ship) { const m = shipMul(S.ships.own[ship.id] || 1); for (const k in ship.pas) add(b.ship, k, ship.pas[k] * m); }
@@ -57,13 +59,13 @@ export function recompute() {
   ST.cdmg = base.cdmg + b.eqCdmg + extra('cdmg');
   ST.dbl = Math.min(1, base.dbl + extra('dbl'));
   ST.trp = Math.min(1, base.trp + extra('trp'));
-  ST.armDmg = K.arm * 0.06;
+  ST.armDmg = g(b.train, 'arm');
   ST.atk *= 1 + ST.armDmg;
-  ST.boss = base.boss * (1 + K.arm * 0.04);
-  ST.def = Math.min(0.6, T.res * TRAIN.res.per);
-  ST.dodge = hakiDodge(K.obs);
+  ST.boss = base.boss * (1 + g(b.train, 'boss'));
+  ST.def = Math.min(0.6, g(b.train, 'def'));
+  ST.dodge = Math.min(0.4, g(b.train, 'dodge'));
   ST.gold = (1 + b.eqGold + extra('gold'));
-  ST.skill = 1 + extra('skill');
+  ST.skill = 1 + extra('skill') + b.eqSkill;
   ST.cdr = Math.min(0.5, extra('cdr'));
   ST.slow = Math.min(0.6, extra('slow'));
   ST.offline = 1 + extra('offline');

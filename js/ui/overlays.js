@@ -8,7 +8,6 @@ import { shipSVG } from '../art/ship.js';
 import { humanParts, variant, moleParts } from '../art/enemies.js';
 import * as BAL from '../data/balance.js';
 import { $, el, ico, newContent, modal } from './dom.js';
-import { HAKI } from '../data/hero.js';
 import { icon } from '../art/icons.js';
 import { sfx, playMusic } from '../core/audio.js';
 import { BOSS_TRACK } from '../core/music.js';
@@ -44,9 +43,9 @@ export function buildOverlays() {
       <div class="desc"><b>${sh.ab.name}:</b> ${sh.ab.desc}</div>
       <div class="desc" style="font-size:1.25rem">Troque de barco em Pirata › Barco.</div></div>` });
   });
-  on('hakiUnlock', h => {
+  on('hakiUnlock', () => {
     sfx('unlock');
-    modal({ title: 'Haki despertado!', body: `<div class="det"><div class="big" style="--gc:#2a1a5a;--gc2:#5a3ab0;--gb:${h.col};width:12rem;height:12rem"><div style="width:70%;height:70%;margin:15%;border-radius:50%;background:radial-gradient(circle at 40% 35%, #fff, ${h.col} 45%, #2a1a3e)"></div></div>
-      <div class="nm f-num ol">${h.name}</div><div class="desc">Use pontos de treino para melhorá-lo em Pirata › Haki.</div></div>` });
+    modal({ title: 'Haki despertado!', body: `<div class="det"><div class="big" style="--gc:#2a1a5a;--gc2:#5a3ab0;--gb:#7ee0ff;width:12rem;height:12rem"><div style="width:70%;height:70%;margin:15%;border-radius:50%;background:radial-gradient(circle at 40% 35%, #fff, #7ee0ff 45%, #2a1a3e)"></div></div>
+      <div class="nm f-num ol">Árvore de Haki</div><div class="desc">A árvore de Haki foi liberada. Gaste SP em Pirata › Maestria › Haki.</div></div>` });
   });
 }

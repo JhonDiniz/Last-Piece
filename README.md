@@ -31,15 +31,15 @@ Depois abra `http://localhost:8080`.
 
 ## Como funciona
 
-- **Personagem**: na primeira vez você monta seu pirata (pele, cabelo, chapéu, roupa, arma, barba e expressão). Dá para mudar depois em Pirata › Editar visual.
-- **Batalha**: o barco fica no mar, à esquerda, e os inimigos vêm andando pela ilha, à direita. Ondas de inimigos e um chefe por fase, que precisa cair em 30 segundos. Só o capitão tem vida: se ele cair (ou o chefe escapar), a fase se repete sem chefe até você tocar em **Desafiar chefe**, no topo da tela.
-- **XP e treino**: derrotar inimigos dá XP. Cada nível aumenta ATQ e PV e dá pontos de treino para Força, Resistência, Agilidade, Precisão e Vitalidade. O Haki desperta no nível 15 (Observação: esquiva), 30 (Armamento: dano) e 50 (Rei: atordoa e fere todos).
+- **Personagem**: na primeira vez você monta seu pirata chibi (pele, cabelo, cor dos olhos, chapéu, roupa, calça, expressão, detalhe e arma). Dá para mudar depois em Pirata › Editar visual. Um manto equipado aparece como capa.
+- **Batalha**: o barco fica no mar, à esquerda, com o capitão e até 2 companheiros; os inimigos vêm andando pela ilha, à direita, e se espalham em profundidade (no máximo 5 de cada vez). Ondas de inimigos e um chefe por fase, que precisa cair em 30 segundos. Só o capitão tem vida: se ele cair (ou o chefe escapar), a fase se repete sem chefe até você tocar em **Desafiar chefe**, no topo da tela.
+- **XP e Maestria**: derrotar inimigos dá XP. Cada nível aumenta ATQ e PV e dá SP para a árvore de Maestria (Força, Vigor, Reflexos, Golpe Crítico, Ouro, XP e mais). A árvore de Haki abre no nível 15: Observação (esquiva), Armamento (nível 30, dano) e Rei (nível 50, atordoa e fere todos).
 - **Barcos**: começa no Bote; Going Merry, Galeão da Marinha, Thousand Sunny, Moby Dick, Red Force e Oro Jackson chegam ao longo da jornada. Cada barco dá bônus que crescem com o nível e tem uma habilidade especial automática.
 - **Bando**: Luffy, Zoro, Nami, Sanji, Chopper, Robin, Franky e Brook lutam do convés e soltam sua ULT sozinhos de tempos em tempos.
 - **Atributos**: ATQ, PV, Recuperação, VATQ, Crítico, Dano Crítico, Ataque Duplo e Triplo, Dano em Chefes, liberados em cadeia. Segure **Melhorar** para comprar vários níveis.
 - **Missões**: guiam o jogo, dão gemas e liberam conteúdo novo (Habilidade na missão 8, Equipamento na 16, Companheiro na 25, Incursão na 30, Mina na 36, Rei Toupeira na 42).
 - **Invocação**: habilidades, equipamentos e companheiros em 8 raridades, com nível de invocação que melhora as chances. Cópias repetidas fundem e sobem o nível; tudo que você possui dá bônus passivo.
-- **20 habilidades** com efeitos próprios, **64 equipamentos** em 4 espaços e **8 companheiros** do bando.
+- **20 habilidades** com efeitos próprios, **64 equipamentos** em 4 espaços (arma, manto, chapéu e fruta do diabo) e **8 companheiros** do bando.
 - **Incursão**: destrua 5 construções da vila em 45 s para ganhar pó e baús de relíquias (28 relíquias).
 - **Mina**: cave blocos com picaretas e encontre ouro, gemas, bombas e 24 tesouros.
 - **Rei Toupeira**: chefe que não cai; quanto mais dano em 30 s, melhor a recompensa.

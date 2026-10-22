@@ -42,13 +42,23 @@ export function unequipPet(id) { const i = S.pets.eq.indexOf(id); if (i >= 0) { 
 export function autoEquipPets() {
   const own = Object.keys(S.pets.own).filter(id => PET[id]).sort((a, b) => (PET[b].g - PET[a].g) || (S.pets.own[b].lv - S.pets.own[a].lv));
   const n = petSlotsOpen();
-  S.pets.eq = [0, 1, 2, 3, 4].map(i => (i < n ? own[i] || null : null));
+  S.pets.eq = PET_SLOTS.map((_, i) => (i < n ? own[i] || null : null));
   recompute(); emit('pets'); checkMission(); save();
 }
 
 // drop data from older saves that no longer exists (old companions, slimes)
 const OLD_PET_GRADE = { pintinho: 0, gato: 0, morcego: 1, sapo: 1, raposa: 2, abelha: 2, coruja: 3, fantasma: 3, dragaozinho: 4, unicornio: 4, fenix: 5, golem: 5, polvo: 6, estrela: 6, leao: 7, baleia: 7 };
+const OLD_SLOT = { armor: 'cloak', ring: 'hat', amulet: 'fruit' };
 export function migrateSave() {
+  // the old training / Haki points go back to the pool for the mastery tree
+  const H = S.hero;
+  for (const k of ['train', 'haki']) if (H[k]) { for (const x in H[k]) H.pts += H[k][x] || 0; delete H[k]; }
+  // armor / ring / amulet became cloak / hat / devil fruit
+  for (const id in S.gear.own) {
+    const [slot, g, i] = id.split('_');
+    if (OLD_SLOT[slot]) { const nid = `${OLD_SLOT[slot]}_${g}_${i}`; S.gear.own[nid] = S.gear.own[id]; delete S.gear.own[id]; }
+  }
+  for (const k in OLD_SLOT) if (k in S.gear.eq) { const id = S.gear.eq[k]; if (id) S.gear.eq[OLD_SLOT[k]] = id.replace(k + '_', OLD_SLOT[k] + '_'); delete S.gear.eq[k]; }
   // old companions become the crewmate of the same grade
   for (const id in S.pets.own) {
     if (PET[id]) continue;
@@ -60,7 +70,10 @@ export function migrateSave() {
     }
     delete S.pets.own[id];
   }
-  S.pets.eq = S.pets.eq.map((id, i, a) => (a.indexOf(id) === i ? id : null));
+  // the deck fits only two crewmates now
+  const keep = [];
+  for (const id of S.pets.eq) if (id && !keep.includes(id)) keep.push(id);
+  S.pets.eq = PET_SLOTS.map((_, i) => keep[i] || null);
   S.pets.eq = S.pets.eq.map(id => (id && PET[id] && S.pets.own[id] ? id : null));
   delete S.slimes;
 }

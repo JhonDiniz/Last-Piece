@@ -1,13 +1,16 @@
-// Draws the battle: parallax scenery, hero, enemies, projectiles, effects.
+// Draws the battle: sky and sea, the island with depth, the ship with the
+// captain and crew, enemies, projectiles and effects.
 import { S } from '../core/state.js';
-import { B, W, world, heroAtk, shipBob } from '../game/battle.js';
+import { B, W, world, heroAtk, shipBob, shoreAt, zToY, gy } from '../game/battle.js';
 import { sprite, setScale } from './sprites.js';
-import { biomeLayers, LAYER_H, STRIP, BIOMES, cloudSVG } from '../art/scenery.js';
+import { biomeLayers, LAYER_H, STRIP, BIOMES, cloudSVG, propSVG, PROP_W, PROP_H, ISLAND_PROPS, ISLAND_GROUND } from '../art/scenery.js';
+import { rng, dark, light } from '../art/kit.js';
 import { humanParts, variant, EW, EH, PIV, buildingSVG, moleParts } from '../art/enemies.js';
 import { icon } from '../art/icons.js';
 import { shipSVG, SHIP_W, SHIP_H, SHIP_DECK } from '../art/ship.js';
 import { SHIP } from '../data/ships.js';
-import { lookSpec, defaultLook } from '../data/hero.js';
+import { chibiParts, CW, CH, CPIV } from '../art/chibi.js';
+import { heroLook } from '../game/hero.js';
 import { drawSkillFx } from './skillfx.js';
 import { drawPets } from './petsfx.js';
 
@@ -39,12 +42,11 @@ function layers(biome) {
   if (!L) { L = biomeLayers(biome); layerCache.set(biome, L); }
   return L;
 }
-export function heroSpec() { return lookSpec(S.hero.look || defaultLook()); }
+export const heroKey = () => 'hero:' + Object.values(heroLook()).join('|');
 function heroParts() {
-  const spec = heroSpec();
-  const key = 'hero:' + Object.values(spec).join('|');
+  const key = heroKey();
   let p = partCache.get(key);
-  if (!p) { p = humanParts(spec); partCache.set(key, p); }
+  if (!p) { p = chibiParts(heroLook()); partCache.set(key, p); }
   return { key, p };
 }
 function enemyParts(e) {
@@ -63,49 +65,24 @@ export function draw(dt) {
   ctx.translate(sx, sy);
   const biome = B.bg || B.info.region.bg;
   const L = layers(biome), b = L.b;
-  const feet = world.feet;
-  const gTop = feet - 18;
+  drawSky(biome, L, b, H);
+  drawSea(world.horizon, H);
+  drawIsland(biome, L, b, H);
 
-  // sky
-  const horizon = feet - 140;
-  const grd = ctx.createLinearGradient(0, 0, 0, horizon);
-  grd.addColorStop(0, b.sky[0]); grd.addColorStop(0.55, b.sky[1]); grd.addColorStop(1, b.sky[2]);
-  ctx.fillStyle = grd;
-  ctx.fillRect(-10, -10, W + 20, H + 20);
-  // sun glow
-  const sg = ctx.createRadialGradient(W * 0.78, H * 0.16, 4, W * 0.78, H * 0.16, 120);
-  sg.addColorStop(0, b.sun); sg.addColorStop(0.25, hexA(b.sun, 0.55)); sg.addColorStop(1, hexA(b.sun, 0));
-  ctx.fillStyle = sg; ctx.fillRect(0, 0, W, H * 0.6);
-  // clouds
-  for (let i = 0; i < 4; i++) {
-    const cs = sprite('cloud' + (i % 3) + biome, () => cloudSVG(i, b.cloud), 130, 70, { lowres: true });
-    if (!cs) continue;
-    const speed = 6 + i * 3;
-    const x = ((i * 137 - B.time * speed - B.scroll * 0.05) % (W + 160) + W + 160) % (W + 160) - 130;
-    const y = 50 + (i % 2) * 30 + i * 6;
-    const s = 0.7 + (i % 3) * 0.18;
-    ctx.globalAlpha = 0.95;
-    ctx.drawImage(cs.c, x, y, 130 * s, 70 * s);
-  }
-  ctx.globalAlpha = 1;
-  // distant islands on the horizon
-  ctx.save(); ctx.beginPath(); ctx.rect(-10, -10, W + 20, horizon + 10); ctx.clip();
-  strip(biome, 'far', L.far, horizon - LAYER_H.far + 40, 0.08);
-  ctx.restore();
-  drawSea(horizon, feet, H);
-  drawIsland(biome, L, b, feet, gTop, H);
-  drawShip(feet);
-
-  // entities
-  drawShadows(feet);
-  const list = B.enemies.slice().sort((a, b) => b.x - a.x);
-  for (const e of list) if (e.state !== 'die') drawEnemy(e, feet);
-  drawPets(ctx, feet, dt);
-  drawHero(feet);
-  drawWaterFront(feet);
-  for (const e of list) if (e.state === 'die') drawEnemy(e, feet);
-  drawSkillFx(ctx, feet, dt);
-  drawProjs(feet);
+  // entities: props and enemies sorted by depth; the ship sits on the left
+  drawShip();
+  drawPets(ctx, world.deckY, dt);
+  drawHero();
+  drawWaterFront();
+  const items = [];
+  for (const pr of islandProps(biome)) items.push({ y: pr.y, prop: pr });
+  for (const e of B.enemies) if (e.state !== 'die') items.push({ y: gy(e), e });
+  items.sort((p, q) => p.y - q.y);
+  drawShadows();
+  for (const it of items) { if (it.prop) drawProp(it.prop, biome); else drawEnemy(it.e); }
+  for (const e of B.enemies) if (e.state === 'die') drawEnemy(e);
+  drawSkillFx(ctx, world.gmid, dt);
+  drawProjs();
   drawFx();
   drawDrops();
   drawTexts();
@@ -123,169 +100,233 @@ function strip(biome, name, svgStr, y, par) {
   if (x + 2 * STRIP < W) ctx.drawImage(s.c, x + 2 * STRIP, y, STRIP, h);
 }
 
-function drawShadows(feet) {
+function drawShadows() {
   ctx.fillStyle = 'rgba(30,16,50,.22)';
-  const h = B.hero;
-  ell(h.x, feet + 1 + shipBob(), 20, 4);
-  for (const e of B.enemies) if (e.state !== 'die') ell(e.x, feet + 1, 22 * e.scale, 5 * e.scale);
+  for (const e of B.enemies) if (e.state !== 'die' && !e.building) ell(e.x, gy(e) + 1, 20 * e.scale, 5 * e.scale);
 }
 function ell(x, y, rx, ry) { ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); ctx.fill(); }
 
-// ------------------------------------------------------------------ sea, island, ship
-function drawSea(horizon, feet, H) {
-  const t = B.time;
-  const g = ctx.createLinearGradient(0, horizon, 0, H);
-  g.addColorStop(0, '#7fd3f0'); g.addColorStop(0.25, '#3fa8e0'); g.addColorStop(1, '#1f5fa8');
-  ctx.fillStyle = g;
-  ctx.fillRect(-10, horizon, W + 20, H - horizon + 10);
-  ctx.fillStyle = 'rgba(255,255,255,.55)';
-  ctx.fillRect(-10, horizon, W + 20, 2);
-  // wave lines drifting left (faster while sailing)
-  ctx.strokeStyle = 'rgba(255,255,255,.45)'; ctx.lineWidth = 2; ctx.lineCap = 'round';
-  for (let row = 0; row < 7; row++) {
-    const y = horizon + 10 + row * row * 4.2 + row * 6;
-    if (y > H) break;
-    const len = 10 + row * 5, gap = 50 + row * 18;
-    const off = ((B.scroll * (0.3 + row * 0.12) + t * (8 + row * 3)) % gap + gap) % gap;
-    ctx.globalAlpha = 0.3 + row * 0.07;
-    ctx.beginPath();
-    for (let x = -gap - off + (row % 2) * gap / 2; x < W + gap; x += gap) { ctx.moveTo(x, y); ctx.quadraticCurveTo(x + len / 2, y - 3, x + len, y); }
-    ctx.stroke();
+// ------------------------------------------------------------------ sky, sea, island, ship
+function drawSky(biome, L, b, H) {
+  const hz = world.horizon;
+  const grd = ctx.createLinearGradient(0, 0, 0, hz);
+  grd.addColorStop(0, b.sky[0]); grd.addColorStop(0.6, b.sky[1]); grd.addColorStop(1, b.sky[2]);
+  ctx.fillStyle = grd;
+  ctx.fillRect(-10, -10, W + 20, hz + 20);
+  const sg = ctx.createRadialGradient(W * 0.8, hz * 0.45, 4, W * 0.8, hz * 0.45, 110);
+  sg.addColorStop(0, b.sun); sg.addColorStop(0.25, hexA(b.sun, 0.55)); sg.addColorStop(1, hexA(b.sun, 0));
+  ctx.fillStyle = sg; ctx.fillRect(0, 0, W, hz);
+  for (let i = 0; i < 4; i++) {
+    const cs = sprite('cloud' + (i % 3) + biome, () => cloudSVG(i, b.cloud), 130, 70, { lowres: true });
+    if (!cs) continue;
+    const speed = 5 + i * 2.5;
+    const x = ((i * 137 - B.time * speed) % (W + 160) + W + 160) % (W + 160) - 130;
+    const y = hz - 120 + (i % 2) * 26 + i * 6;
+    const sc = 0.6 + (i % 3) * 0.16;
+    ctx.globalAlpha = 0.9;
+    ctx.drawImage(cs.c, x, y, 130 * sc, 70 * sc);
   }
   ctx.globalAlpha = 1;
+  // distant islands sitting on the horizon (slightly faded)
+  ctx.save(); ctx.beginPath(); ctx.rect(-10, -10, W + 20, hz + 10); ctx.clip();
+  ctx.globalAlpha = 0.75;
+  strip(biome, 'far', L.far, hz - LAYER_H.far + 58, 0.04);
+  ctx.restore();
 }
 
-function islandPath(feet, H) {
-  const sx = world.shore, wl = feet + 22;
+function drawSea(hz, H) {
+  const t = B.time;
+  const g = ctx.createLinearGradient(0, hz, 0, H);
+  g.addColorStop(0, '#8adcf4'); g.addColorStop(0.18, '#4ab4e6'); g.addColorStop(0.6, '#2a86cf'); g.addColorStop(1, '#1f5fa8');
+  ctx.fillStyle = g;
+  ctx.fillRect(-10, hz, W + 20, H - hz + 10);
+  ctx.fillStyle = 'rgba(255,255,255,.6)'; ctx.fillRect(-10, hz, W + 20, 1.6);
+  // sun sparkle on the water
+  ctx.fillStyle = 'rgba(255,255,255,.35)';
+  for (let i = 0; i < 6; i++) { const x = W * 0.8 + Math.sin(t * 1.3 + i * 1.7) * 30 - i * 4, y = hz + 6 + i * 5; ctx.fillRect(x - 8 + i, y, 16 - i * 2, 1.4); }
+  // wave lines: they get bigger and slower closer to the viewer
+  ctx.lineCap = 'round';
+  const sail = B.walking ? 1.8 : 1;
+  for (let row = 0; row < 9; row++) {
+    const p = row / 8, y = hz + 8 + p * p * (H - hz - 8);
+    const len = 8 + p * 18, gap = 46 + p * 50, amp = 1.5 + p * 2.5;
+    const off = ((t * (10 + p * 18) * sail) % gap + gap) % gap;
+    ctx.strokeStyle = `rgba(255,255,255,${0.25 + p * 0.3})`; ctx.lineWidth = 1.2 + p * 1.6;
+    ctx.beginPath();
+    for (let x = -gap + off - (row % 2) * gap / 2; x < W + gap; x += gap) { ctx.moveTo(x, y); ctx.quadraticCurveTo(x + len / 2, y - amp, x + len, y); }
+    ctx.stroke();
+  }
+}
+
+// island outline: the coast follows shoreAt(), the far edge is a soft curve
+function islandShape(inset, H) {
+  const top = world.gFar - 6 + inset * 0.5;
   ctx.beginPath();
-  ctx.moveTo(sx - 26, H + 10);
-  ctx.lineTo(sx - 26, wl + 4);
-  ctx.quadraticCurveTo(sx - 12, wl - 2, sx + 2, feet + 8);
-  ctx.quadraticCurveTo(sx + 12, feet - 2, sx + 30, feet - 4);
-  ctx.lineTo(W + 20, feet - 4);
-  ctx.lineTo(W + 20, H + 10);
+  ctx.moveTo(W + 20, top - 6);
+  ctx.quadraticCurveTo(shoreAt(top) + 40, top - 8, shoreAt(top) + 10 + inset, top + 2);
+  for (let y = top + 4; y <= H + 12; y += 5) ctx.lineTo(shoreAt(y) + inset + Math.sin(y * 0.11) * 2.4, y);
+  ctx.lineTo(W + 20, H + 12);
   ctx.closePath();
 }
-function drawIsland(biome, L, b, feet, gTop, H) {
-  const sx = world.shore;
-  // trees and houses behind the shore, only over the island
-  ctx.save(); ctx.beginPath(); ctx.rect(sx + 18, -10, W, feet); ctx.clip();
-  const fade = ctx.createLinearGradient(sx + 18, 0, sx + 70, 0);
-  strip(biome, 'mid', L.mid, gTop - LAYER_H.mid + 8, 0.42);
-  strip(biome, 'near', L.near, gTop - LAYER_H.near + 10, 0.75);
-  ctx.restore();
-  void fade;
-  // beach + ground
+const backCache = new Map();
+function drawIsland(biome, L, b, H) {
+  const [grass, sand] = ISLAND_GROUND[biome] || ISLAND_GROUND.forest;
+  const top = world.gFar - 6, sx0 = shoreAt(top);
+  // backdrop: a hill with the biome's trees and houses, sloping down to the coast
   ctx.save();
-  islandPath(feet, H);
-  ctx.fillStyle = '#f2d89a'; ctx.fill();
-  ctx.lineWidth = 3; ctx.strokeStyle = '#2a1a3e'; ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(sx0 - 6, top + 4);
+  ctx.bezierCurveTo(sx0 + 20, top - 40, sx0 + 40, top - 150, sx0 + 90, top - 190);
+  ctx.lineTo(W + 20, top - 200); ctx.lineTo(W + 20, top + 4); ctx.closePath();
   ctx.clip();
-  ctx.save(); ctx.beginPath(); ctx.rect(sx + 22, -10, W, H + 20); ctx.clip();
-  strip(biome, 'ground', L.ground, gTop, 1);
+  ctx.fillStyle = dark(b.far[0], 0.08);
+  ctx.beginPath(); ctx.moveTo(sx0 - 10, top + 4); ctx.bezierCurveTo(sx0 + 10, top - 26, sx0 + 50, top - 46, W + 20, top - 54); ctx.lineTo(W + 20, top + 4); ctx.fill();
+  strip(biome, 'mid', L.mid, top - LAYER_H.mid + 14, 0.02);
   ctx.restore();
+  // beach and ground top
+  islandShape(0, H);
+  ctx.fillStyle = sand; ctx.fill();
+  ctx.lineWidth = 2.6; ctx.strokeStyle = '#2a1a3e'; ctx.stroke();
+  islandShape(14, H);
+  const gg = ctx.createLinearGradient(0, top, 0, world.feet);
+  gg.addColorStop(0, dark(grass, 0.18)); gg.addColorStop(0.5, grass); gg.addColorStop(1, light(grass, 0.12));
+  ctx.fillStyle = gg; ctx.fill();
+  ctx.lineWidth = 2; ctx.strokeStyle = dark(grass, 0.3); ctx.stroke();
+  // ground details (seeded, so they stay put), smaller when farther
+  const R = rng(biome.length * 17 + 3);
+  ctx.save(); islandShape(18, H); ctx.clip();
+  for (let i = 0; i < 46; i++) {
+    const z = R(), y = zToY(z) + R() * 10 - 4, x = shoreAt(y) + 20 + R() * (W - shoreAt(y));
+    const s = 0.6 + z * 0.5;
+    ctx.fillStyle = i % 3 ? dark(grass, 0.14) : light(grass, 0.2);
+    ctx.beginPath();
+    if (i % 3) { ctx.moveTo(x - 4 * s, y); ctx.lineTo(x - 2 * s, y - 6 * s); ctx.lineTo(x, y - 1); ctx.lineTo(x + 2 * s, y - 7 * s); ctx.lineTo(x + 4 * s, y); }
+    else ctx.ellipse(x, y, 4 * s, 1.8 * s, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
   ctx.restore();
-  // foam on the shore
-  const t = B.time, wl = feet + 22;
-  ctx.fillStyle = 'rgba(255,255,255,.8)';
-  for (let i = 0; i < 4; i++) { const x = sx - 30 + i * 12 + Math.sin(t * 2 + i) * 3; ctx.beginPath(); ctx.ellipse(x, wl + 2 + (i % 2) * 2, 9, 3, 0, 0, Math.PI * 2); ctx.fill(); }
+  // foam where the waves meet the beach
+  const t = B.time;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.4; ctx.setLineDash([10, 7]); ctx.lineDashOffset = -t * 14;
+  ctx.beginPath();
+  for (let y = top + 6; y <= H + 10; y += 5) { const x = shoreAt(y) - 4 + Math.sin(t * 2 + y * 0.2) * 1.6; if (y === top + 6) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
+  ctx.stroke();
+  ctx.restore();
+  void backCache;
 }
 
-const shipX = s => (s.id === 'bote' ? 166 : 180) - 105 * s.size;
-function drawShip(feet) {
+function islandProps(biome) {
+  return (ISLAND_PROPS[biome] || ISLAND_PROPS.forest).map(([kind, x, z]) => {
+    const y = z < 0 ? world.gFar + 2 + z * 20 : zToY(z);
+    return { kind, x, z, y, s: 0.55 + 0.25 * Math.max(0, Math.min(1, z + 0.2)) };
+  });
+}
+function drawProp(pr, biome) {
+  const sp = sprite('prop:' + biome + ':' + pr.kind, () => propSVG(pr.kind, biome), PROP_W * 0.7, PROP_H * 0.7, { lowres: true });
+  if (!sp) return;
+  const w = PROP_W * pr.s, h = PROP_H * pr.s;
+  ctx.drawImage(sp.c, pr.x - w / 2, pr.y - h * (116 / 120), w, h);
+}
+
+const shipLeft = s => 158 - 200 * s.size;
+function drawShip() {
   const s = SHIP[S.ships.cur] || SHIP.bote;
   const sp = sprite('ship:' + s.id, () => shipSVG(s), SHIP_W * s.size, SHIP_H * s.size);
   if (!sp) return;
   const bob = shipBob();
   const w = SHIP_W * s.size, h = SHIP_H * s.size;
-  const x = shipX(s), y = feet - SHIP_DECK * s.size + bob + 4 * s.size;
+  const x = shipLeft(s), y = world.deckY - SHIP_DECK * s.size + 4 * s.size + bob;
+  // wake behind the ship
+  ctx.fillStyle = 'rgba(255,255,255,.35)';
+  ctx.beginPath(); ctx.ellipse(x + w * 0.5, world.deckY + 26, w * 0.55, 6, 0, 0, Math.PI * 2); ctx.fill();
   ctx.save();
   ctx.translate(x + w / 2, y + h);
   ctx.rotate(Math.sin(B.time * 1.6 + 0.6) * 0.012);
   ctx.drawImage(sp.c, -w / 2, -h, w, h);
   ctx.restore();
 }
-function drawWaterFront(feet) {
+function drawWaterFront() {
   // a translucent wave band over the bottom of the hull so the ship floats
-  const t = B.time, wl = feet + 24, s = SHIP[S.ships.cur] || SHIP.bote;
-  const x0 = shipX(s) - 10, x1 = x0 + SHIP_W * s.size + 20;
-  ctx.fillStyle = 'rgba(63,168,224,.85)';
+  const t = B.time, wl = world.deckY + 26, s = SHIP[S.ships.cur] || SHIP.bote;
+  const x0 = shipLeft(s) - 10, x1 = x0 + SHIP_W * s.size + 20;
+  ctx.fillStyle = 'rgba(58,160,222,.9)';
   ctx.beginPath();
-  ctx.moveTo(x0, wl + 30);
-  for (let x = x0; x <= x1; x += 8) ctx.lineTo(x, wl + Math.sin(x * 0.08 + t * 3) * 2.2);
-  ctx.lineTo(x1, wl + 30); ctx.closePath(); ctx.fill();
-  ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 2;
+  ctx.moveTo(x0, wl + 40);
+  for (let x = x0; x <= x1; x += 6) ctx.lineTo(x, wl + Math.sin(x * 0.08 + t * 3) * 2.2);
+  ctx.lineTo(x1, wl + 40); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = 2;
   ctx.beginPath();
-  for (let x = x0; x <= x1; x += 8) ctx.lineTo(x, wl + Math.sin(x * 0.08 + t * 3) * 2.2);
+  for (let x = x0; x <= x1; x += 6) ctx.lineTo(x, wl + Math.sin(x * 0.08 + t * 3) * 2.2);
   ctx.stroke();
 }
 
-// ------------------------------------------------------------------ hero
-const HS = 0.6;  // hero sprite scale (same rig as the enemies, mirrored to face right)
-function drawHero(feet) {
+// ------------------------------------------------------------------ hero (chibi)
+const HS = 0.64;
+function drawHero() {
   const h = B.hero;
   const { key, p } = heroParts();
-  const sc = HS, w = EW * sc, hh = EH * sc;
+  const w = CW * HS, hh = CH * HS;
   const parts = {};
-  for (const n of ['legB', 'legF', 'body', 'arm']) parts[n] = sprite(key + ':' + n, p[n], w, hh, { flash: true });
+  for (const n of ['legB', 'legF', 'armB', 'body', 'armF']) parts[n] = sprite(key + ':' + n, p[n], w, hh, { flash: true });
   if (!parts.body) return;
   const t = B.time;
-  let armA = 0, by = 0, lean = 0, rot = 0, oy = 0, alpha = 1;
+  let armA = 0, armB = 0, by = 0, lean = 0, rot = 0, oy = 0, alpha = 1, legA = 0;
   if (h.dead) {
     const d = Math.min(1, B.pt * 3);
-    rot = -1.2 * d; oy = 6 * d; alpha = 1 - Math.max(0, B.pt - 1.2);
+    rot = -1.3 * d; oy = 4 * d; alpha = 1 - Math.max(0, B.pt - 1.2);
   } else if (B.phase === 'victory') {
     const j = Math.abs(Math.sin(B.pt * 6));
-    oy = -j * 14; armA = -1.6;
+    oy = -j * 12; armA = -2.2; armB = 0.6; legA = 0.2 * j;
   } else if (h.anim > 0) {
     const pr = 1 - h.anim / h.animLen;
-    if (pr < 0.45) armA = -1.0 * easeOut(pr / 0.45);
-    else armA = -1.0 + 1.9 * easeOut(Math.min(1, (pr - 0.45) / 0.35));
-    lean = pr > 0.45 ? -0.08 : 0.04;
-  } else { by = Math.sin(t * 3) * 0.8; armA = Math.sin(t * 3) * 0.05; }
+    if (pr < 0.4) armA = -1.5 * easeOut(pr / 0.4);
+    else armA = -1.5 + 2.2 * easeOut(Math.min(1, (pr - 0.4) / 0.3));
+    lean = pr > 0.4 ? 0.07 : -0.05; armB = -0.25;
+  } else { by = Math.sin(t * 3.2) * 0.9; armA = Math.sin(t * 3.2) * 0.06; armB = -Math.sin(t * 3.2) * 0.06; }
   ctx.save();
   ctx.globalAlpha = alpha;
-  ctx.translate(h.x, feet + shipBob() + oy);
-  ctx.rotate(rot);
-  ctx.scale(-1, 1);
-  ctx.rotate(lean);
-  ctx.scale(sc, sc);
-  const ox = -68, oyy = -125;
+  ctx.translate(h.x, world.deckY + shipBob() + oy);
+  ctx.rotate(rot + lean);
+  ctx.scale(HS, HS);
+  const ox = -50, oyy = -108;
   const flash = h.hurtT > 0;
   const part = (n, ang, piv) => {
     const sp = parts[n]; if (!sp) return;
     const img = flash && sp.flash ? sp.flash : sp.c;
-    if (ang && piv) {
-      ctx.save(); ctx.translate(piv[0] + ox, piv[1] + oyy); ctx.rotate(ang); ctx.drawImage(img, -piv[0], -piv[1], EW, EH); ctx.restore();
-    } else ctx.drawImage(img, ox, oyy, EW, EH);
+    if (ang && piv) { ctx.save(); ctx.translate(piv[0] + ox, piv[1] + oyy); ctx.rotate(ang); ctx.drawImage(img, -piv[0], -piv[1], CW, CH); ctx.restore(); }
+    else ctx.drawImage(img, ox, oyy, CW, CH);
   };
-  part('legB', 0, PIV.legB);
-  part('legF', 0, PIV.legF);
-  ctx.translate(0, by / sc);
+  part('armB', armB, CPIV.armB);
+  part('legB', -legA, CPIV.legB);
+  part('legF', legA, CPIV.legF);
+  ctx.translate(0, by);
   part('body', 0);
-  part('arm', armA, PIV.arm);
+  part('armF', armA, CPIV.armF);
   ctx.restore();
+  const hy = world.deckY + shipBob();
   if (h.shield > 0) {
     ctx.save();
     ctx.globalAlpha = 0.35 + 0.1 * Math.sin(t * 6);
     ctx.strokeStyle = '#8be0ff'; ctx.lineWidth = 3; ctx.fillStyle = 'rgba(139,224,255,.18)';
-    ctx.beginPath(); ctx.ellipse(h.x, feet - 38, 46, 50, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(h.x, hy - 36, 40, 44, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.restore();
   }
   if (h.buffs.length) {
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     ctx.globalAlpha = 0.18 + 0.08 * Math.sin(t * 8);
-    const ag = ctx.createRadialGradient(h.x, feet - 34, 10, h.x, feet - 34, 60);
+    const ag = ctx.createRadialGradient(h.x, hy - 32, 10, h.x, hy - 32, 56);
     ag.addColorStop(0, '#ffd23f'); ag.addColorStop(1, 'rgba(255,210,63,0)');
-    ctx.fillStyle = ag; ctx.fillRect(h.x - 70, feet - 104, 140, 110);
+    ctx.fillStyle = ag; ctx.fillRect(h.x - 66, hy - 98, 132, 104);
     ctx.restore();
   }
 }
 
 // ------------------------------------------------------------------ enemies
-const ES = 0.6;
-function drawBuilding(e, feet) {
+const ES = 0.52;
+function drawBuilding(e) {
+  const feet = gy(e);
   const sc = ES * e.scale, w = EW * sc, h = EH * sc;
   const sp = sprite('bld:' + e.kind + ':' + (e.tint || 0), () => buildingSVG(e.kind, e.tint || 0), w, h, { flash: true });
   if (!sp) return;
@@ -302,8 +343,9 @@ function drawBuilding(e, feet) {
     ctx.fillStyle = '#ffb02e'; rr(bx, byy, bw * Math.max(0, e.hp / e.max), 6, 3); ctx.fill();
   }
 }
-function drawEnemy(e, feet) {
-  if (e.building) return drawBuilding(e, feet);
+function drawEnemy(e) {
+  if (e.building) return drawBuilding(e);
+  const feet = gy(e);
   const { key, p } = enemyParts(e);
   const sc = ES * e.scale;
   const w = EW * sc, h = EH * sc;
@@ -362,7 +404,7 @@ const easeOut = t => 1 - (1 - t) * (1 - t);
 function rr(x, y, w, h, r) { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, Math.max(0, w), h, r) : ctx.rect(x, y, w, h); }
 
 // ------------------------------------------------------------------ projectiles
-function drawProjs(feet) {
+function drawProjs() {
   for (const p of B.projs) {
     ctx.save();
     ctx.translate(p.x, p.y);
@@ -447,11 +489,10 @@ function drawFx() {
       for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.arc(8 + i * 7 + p * 20, -i * 3 - p * 14, (7 + i) * (0.6 + p), 0, Math.PI * 2); ctx.fill(); }
       ctx.globalAlpha = Math.max(0, 1 - p * 3); ctx.fillStyle = '#ffcc3a'; ctx.beginPath(); ctx.arc(10, 0, 10, 0, Math.PI * 2); ctx.fill();
     } else if (f.kind === 'volley') {
-      const feetY = world.feet;
       for (let i = 0; i < Math.max(3, f.hits.length); i++) {
-        const x = f.hits[i] !== undefined ? f.hits[i] : world.shore + 60 + i * 60;
+        const [x, feetY] = f.hits[i] || [shoreAt(world.gmid) + 40 + i * 50, world.gmid];
         const q = Math.min(1, Math.max(0, (f.t - i * 0.06) / 0.35)), e2 = Math.max(0, (f.t - 0.35 - i * 0.06) / 0.5);
-        if (q < 1) { ctx.fillStyle = '#2a1a3e'; ctx.beginPath(); ctx.arc(world.heroX + (x - world.heroX) * q, feetY - 30 - Math.sin(q * Math.PI) * 90, 6, 0, Math.PI * 2); ctx.fill(); }
+        if (q < 1) { ctx.fillStyle = '#2a1a3e'; ctx.beginPath(); ctx.arc(world.heroX + 30 + (x - world.heroX - 30) * q, world.deckY - 10 + (feetY - 30 - world.deckY + 10) * q - Math.sin(q * Math.PI) * 90, 6, 0, Math.PI * 2); ctx.fill(); }
         else if (e2 < 1) { ctx.globalCompositeOperation = 'lighter'; const g = ctx.createRadialGradient(x, feetY - 30, 2, x, feetY - 30, 46 * (0.5 + e2)); g.addColorStop(0, '#ffffff'); g.addColorStop(0.35, '#ffb23f'); g.addColorStop(1, 'rgba(255,90,40,0)'); ctx.globalAlpha = 1 - e2; ctx.fillStyle = g; ctx.fillRect(x - 70, feetY - 100, 140, 140); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1; }
       }
     } else if (f.kind === 'shock') {
@@ -467,9 +508,9 @@ function drawFx() {
     } else if (f.kind === 'bolts') {
       ctx.globalAlpha = p < 0.2 ? 1 : 1 - (p - 0.2) / 0.8;
       ctx.strokeStyle = f.col || '#ffe14a'; ctx.lineWidth = 4; ctx.lineJoin = 'round';
-      for (const x of (f.xs.length ? f.xs : [world.shore + 80])) {
+      for (const [x, gyv] of (f.xs.length ? f.xs : [[shoreAt(world.gmid) + 60, world.gmid]])) {
         ctx.beginPath(); let y = -10, xx = x; ctx.moveTo(xx, y);
-        while (y < world.feet - 20) { y += 22; xx = x + (Math.random() - 0.5) * 22; ctx.lineTo(xx, y); }
+        while (y < gyv - 20) { y += 22; xx = x + (Math.random() - 0.5) * 22; ctx.lineTo(xx, y); }
         ctx.stroke();
         ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.6; ctx.stroke(); ctx.strokeStyle = f.col || '#ffe14a'; ctx.lineWidth = 4;
       }
@@ -479,10 +520,10 @@ function drawFx() {
       ctx.fillStyle = g; ctx.fillRect(-40, -40 - p * 20, 80, 80);
     } else if (f.kind === 'petals') {
       ctx.globalAlpha = 1 - p * 0.8; ctx.fillStyle = f.col || '#ff8ab0';
-      for (const x of (f.xs.length ? f.xs : [world.shore + 80])) {
-        for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 + f.t * 3; ctx.beginPath(); ctx.ellipse(x + Math.cos(a) * 18, world.feet - 36 + Math.sin(a) * 22, 6, 3, a, 0, Math.PI * 2); ctx.fill(); }
+      for (const [x, gyv] of (f.xs.length ? f.xs : [[shoreAt(world.gmid) + 60, world.gmid]])) {
+        for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 + f.t * 3; ctx.beginPath(); ctx.ellipse(x + Math.cos(a) * 18, gyv - 30 + Math.sin(a) * 18, 6, 3, a, 0, Math.PI * 2); ctx.fill(); }
         ctx.strokeStyle = '#ffd2a6'; ctx.lineWidth = 4;
-        for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.moveTo(x - 14 + i * 9, world.feet); ctx.lineTo(x - 12 + i * 8, world.feet - 30 - 10 * Math.sin(p * Math.PI)); ctx.stroke(); }
+        for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.moveTo(x - 14 + i * 9, gyv); ctx.lineTo(x - 12 + i * 8, gyv - 24 - 8 * Math.sin(p * Math.PI)); ctx.stroke(); }
       }
     } else if (f.kind === 'beam') {
       ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = p < 0.15 ? p / 0.15 : 1 - (p - 0.15) / 0.85;
@@ -491,8 +532,8 @@ function drawFx() {
       ctx.fillStyle = '#ffffff'; ctx.fillRect(0, -3, W, 6);
     } else if (f.kind === 'frost') {
       ctx.globalAlpha = 1 - p; ctx.fillStyle = f.col || '#a0e6ff'; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
-      for (const x of (f.xs.length ? f.xs : [world.shore + 80])) {
-        for (let i = 0; i < 5; i++) { const xx = x - 20 + i * 10, hgt = 16 + (i % 2) * 14; ctx.beginPath(); ctx.moveTo(xx - 6, world.feet); ctx.lineTo(xx, world.feet - hgt * Math.min(1, p * 4)); ctx.lineTo(xx + 6, world.feet); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+      for (const [x, gyv] of (f.xs.length ? f.xs : [[shoreAt(world.gmid) + 60, world.gmid]])) {
+        for (let i = 0; i < 5; i++) { const xx = x - 20 + i * 10, hgt = 16 + (i % 2) * 14; ctx.beginPath(); ctx.moveTo(xx - 6, gyv); ctx.lineTo(xx, gyv - hgt * Math.min(1, p * 4)); ctx.lineTo(xx + 6, gyv); ctx.closePath(); ctx.fill(); ctx.stroke(); }
       }
     } else if (f.kind === 'lvup') {
       ctx.globalAlpha = 1 - p;

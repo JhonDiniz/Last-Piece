@@ -26,7 +26,7 @@ import { B } from '../../game/battle.js';
 
 let tab = 'Invocar', focus = null;
 const artOf = (type, id) => (type === 'skill' ? skillIcon(SKILL[id]) : type === 'pet' ? petSVG(PET[id]) : gearIcon(GEAR_BY[id]));
-const PREVIEW = { skill: ['meteoro', 'martelo', 'raio'], gear: ['weapon_4_0', 'armor_4_1', 'weapon_2_0'], pet: ['zoro', 'luffy', 'nami'] };
+const PREVIEW = { skill: ['meteoro', 'martelo', 'raio'], gear: ['weapon_4_0', 'fruit_7_1', 'hat_4_0'], pet: ['zoro', 'luffy', 'nami'] };
 
 registerScreen('shop', {
   render(body, arg) {

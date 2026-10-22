@@ -281,3 +281,86 @@ export function biomeLayers(k) {
   const b = BIOMES[k] || BIOMES.forest;
   return { b, far: far(b, k), mid: mid(b, k), near: near(b, k), ground: ground(b, k) };
 }
+
+// ---------- island props (single sprites, base at the bottom centre) ----------
+export const PROP_W = 100, PROP_H = 120;
+function palm(x, y, s, leaf, trunk, ol) {
+  let o = `<path d="M ${x - 4 * s} ${y} Q ${x - 10 * s} ${y - 50 * s} ${x + 6 * s} ${y - 92 * s} L ${x + 13 * s} ${y - 90 * s} Q ${x + 2 * s} ${y - 50 * s} ${x + 7 * s} ${y} Z" fill="${trunk}" stroke="${ol}" stroke-width="3" stroke-linejoin="round"/>`;
+  for (let i = 0; i < 6; i++) o += `<path d="M ${x - 3 * s} ${y - (16 + i * 13) * s} L ${x + 8 * s} ${y - (18 + i * 13) * s}" stroke="${dark(trunk, 0.3)}" stroke-width="2"/>`;
+  const fx = x + 9 * s, fy = y - 92 * s;
+  const fronds = [[-46, -4, -20], [-34, 14, 10], [44, -2, -18], [36, 18, 12], [4, -26, -40], [-18, -20, -34]];
+  for (const [dx, dy, c] of fronds) o += `<path d="M ${fx} ${fy} Q ${fx + dx * 0.5 * s} ${fy + c * s} ${fx + dx * s} ${fy + dy * s} Q ${fx + dx * 0.55 * s} ${fy + (c + 12) * s} ${fx} ${fy + 4 * s} Z" fill="${leaf}" stroke="${ol}" stroke-width="2.6" stroke-linejoin="round"/>`;
+  o += `<circle cx="${fx - 3 * s}" cy="${fy + 6 * s}" r="${4.5 * s}" fill="#8a5a3a" stroke="${ol}" stroke-width="2"/><circle cx="${fx + 5 * s}" cy="${fy + 7 * s}" r="${4.5 * s}" fill="#7a4a2a" stroke="${ol}" stroke-width="2"/>`;
+  return o;
+}
+function barrel(x, y, s, ol) {
+  return `<path d="M ${x - 13 * s} ${y} Q ${x - 16 * s} ${y - 17 * s} ${x - 13 * s} ${y - 34 * s} L ${x + 13 * s} ${y - 34 * s} Q ${x + 16 * s} ${y - 17 * s} ${x + 13 * s} ${y} Z" fill="#b8784a" stroke="${ol}" stroke-width="3" stroke-linejoin="round"/>` +
+    `<path d="M ${x - 15 * s} ${y - 9 * s} L ${x + 15 * s} ${y - 9 * s} M ${x - 15 * s} ${y - 25 * s} L ${x + 15 * s} ${y - 25 * s}" stroke="#5a5a6a" stroke-width="${3.4 * s}"/>` +
+    `<ellipse cx="${x}" cy="${y - 34 * s}" rx="${13 * s}" ry="${3.4 * s}" fill="#d8985a" stroke="${ol}" stroke-width="2.4"/>`;
+}
+function crate(x, y, s, ol) {
+  return `<rect x="${x - 15 * s}" y="${y - 28 * s}" width="${30 * s}" height="${28 * s}" fill="#c98a4a" stroke="${ol}" stroke-width="3" stroke-linejoin="round"/>` +
+    `<path d="M ${x - 15 * s} ${y - 28 * s} L ${x + 15 * s} ${y} M ${x + 15 * s} ${y - 28 * s} L ${x - 15 * s} ${y}" stroke="#8a5a2a" stroke-width="${2.6 * s}"/>` +
+    `<rect x="${x - 15 * s}" y="${y - 28 * s}" width="${30 * s}" height="${28 * s}" fill="none" stroke="#e8b878" stroke-width="1.4" opacity=".6"/>`;
+}
+function hut(x, y, s, wall, roof, ol) {
+  return `<rect x="${x - 24 * s}" y="${y - 34 * s}" width="${48 * s}" height="${34 * s}" fill="${wall}" stroke="${ol}" stroke-width="3"/>` +
+    `<rect x="${x - 7 * s}" y="${y - 22 * s}" width="${14 * s}" height="${22 * s}" rx="${3 * s}" fill="#6a4426" stroke="${ol}" stroke-width="2.4"/>` +
+    `<path d="M ${x - 34 * s} ${y - 30 * s} L ${x} ${y - 62 * s} L ${x + 34 * s} ${y - 30 * s} Z" fill="${roof}" stroke="${ol}" stroke-width="3" stroke-linejoin="round"/>` +
+    `<path d="M ${x - 26 * s} ${y - 36 * s} L ${x} ${y - 55 * s} L ${x + 26 * s} ${y - 36 * s}" fill="none" stroke="${light(roof, 0.25)}" stroke-width="2.4"/>`;
+}
+function cactus(x, y, s, col, ol) {
+  return `<path d="M ${x - 7 * s} ${y} L ${x - 7 * s} ${y - 56 * s} Q ${x} ${y - 66 * s} ${x + 7 * s} ${y - 56 * s} L ${x + 7 * s} ${y} Z M ${x - 7 * s} ${y - 26 * s} L ${x - 18 * s} ${y - 26 * s} Q ${x - 23 * s} ${y - 26 * s} ${x - 23 * s} ${y - 32 * s} L ${x - 23 * s} ${y - 44 * s} Q ${x - 18 * s} ${y - 49 * s} ${x - 14 * s} ${y - 44 * s} L ${x - 14 * s} ${y - 34 * s} L ${x - 7 * s} ${y - 34 * s} Z" fill="${col}" stroke="${ol}" stroke-width="3" stroke-linejoin="round"/>`;
+}
+function deadTree(x, y, s, col, ol) {
+  const d = `M ${x - 2 * s} ${y} Q ${x} ${y - 40 * s} ${x - 18 * s} ${y - 78 * s} M ${x} ${y - 40 * s} Q ${x + 16 * s} ${y - 60 * s} ${x + 26 * s} ${y - 62 * s} M ${x - 9 * s} ${y - 58 * s} Q ${x - 24 * s} ${y - 60 * s} ${x - 30 * s} ${y - 52 * s}`;
+  return `<path d="${d}" stroke="${ol}" stroke-width="${11 * s}" fill="none" stroke-linecap="round"/><path d="${d}" stroke="${col}" stroke-width="${6 * s}" fill="none" stroke-linecap="round"/>`;
+}
+function column(x, y, s, ol) {
+  return `<rect x="${x - 10 * s}" y="${y - 70 * s}" width="${20 * s}" height="${70 * s}" fill="#fbf6ff" stroke="${ol}" stroke-width="3"/>` +
+    `<rect x="${x - 15 * s}" y="${y - 78 * s}" width="${30 * s}" height="${10 * s}" rx="3" fill="#fff" stroke="${ol}" stroke-width="3"/>` +
+    `<path d="M ${x - 4 * s} ${y - 66 * s} L ${x - 4 * s} ${y - 4 * s} M ${x + 4 * s} ${y - 66 * s} L ${x + 4 * s} ${y - 4 * s}" stroke="#e8dcf6" stroke-width="2.4"/>`;
+}
+function flagPole(x, y, s, col, ol) {
+  return `<rect x="${x - 2 * s}" y="${y - 80 * s}" width="${4 * s}" height="${80 * s}" fill="#8a5a3a" stroke="${ol}" stroke-width="2"/>` +
+    `<path d="M ${x + 2 * s} ${y - 78 * s} L ${x + 30 * s} ${y - 72 * s} L ${x + 2 * s} ${y - 62 * s} Z" fill="${col}" stroke="${ol}" stroke-width="2.4" stroke-linejoin="round"/>`;
+}
+export function propSVG(kind, k) {
+  const b = BIOMES[k] || BIOMES.forest, ol = OL, x = 50, y = 116;
+  let s = '';
+  switch (kind) {
+    case 'palm': s = palm(x - 6, y, 1, b === BIOMES.desert ? '#6fae4a' : b.leaf, '#b8844a', ol); break;
+    case 'tree': s = roundTree(x, y, 0.95, b.leaf, b.trunk, ol, 3); break;
+    case 'pine': s = pine(x, y, 1.05, b.leaf2, b.trunk, ol, 3, k === 'snow'); break;
+    case 'bush': s = bush(x, y, 1.1, b.leaf2, ol, 1.6, k === 'forest' ? '#e8384f' : null); break;
+    case 'rock': s = rock(x, y, 1.6, k === 'volcano' ? '#3a2a2e' : k === 'snow' ? '#bdf3ff' : '#a8a8b8', ol, 3); break;
+    case 'barrel': s = barrel(x, y, 1, ol); break;
+    case 'crate': s = crate(x, y, 1, ol) + crate(x + 22, y, 0.7, ol); break;
+    case 'hut': s = hut(x, y, 1, k === 'desert' ? '#e8c88a' : '#f0dcb4', k === 'desert' ? '#c98a4a' : '#d8584a', ol); break;
+    case 'house': s = house(x, y, 0.9, '#f0dcb4', '#d8584a', ol, 3); break;
+    case 'cactus': s = cactus(x, y, 1.1, b.leaf, ol); break;
+    case 'dead': s = deadTree(x, y, 1, b.trunk, ol); break;
+    case 'mushroom': s = mushroom(x, y, 2, '#c86ad8', ol) + mushroom(x + 22, y, 1.3, '#e8384f', ol); break;
+    case 'column': s = column(x, y, 1, ol); break;
+    case 'cloud': s = blob([c(x - 18, y - 16, 16), c(x + 4, y - 24, 20), c(x + 24, y - 14, 14), `<rect x="${x - 32}" y="${y - 14}" width="${70}" height="14" rx="7"/>`], '#ffffff', 1.8, mix(OL, '#c8b8e8', 0.4)); break;
+    case 'flag': s = flagPole(x, y, 1, '#3f6fd8', ol); break;
+    case 'lava': s = rock(x, y, 1.8, '#3a2a2e', ol, 3) + `<path d="M ${x - 6} ${y - 28} L ${x + 2} ${y - 16} L ${x - 4} ${y - 4}" stroke="#ff7a2a" stroke-width="3" fill="none"/>`; break;
+  }
+  return svg(PROP_W, PROP_H, s);
+}
+// prop layout per biome: [kind, x, z] (z < 0 sits on the far edge, behind everyone)
+export const ISLAND_PROPS = {
+  forest: [['tree', 300, -0.08], ['palm', 352, -0.06], ['bush', 270, -0.02], ['rock', 384, 0.5], ['bush', 372, 1.02]],
+  village: [['house', 312, -0.1], ['palm', 368, -0.05], ['barrel', 272, -0.02], ['crate', 382, 0.55], ['barrel', 360, 1.04]],
+  swamp: [['dead', 296, -0.08], ['dead', 360, -0.05], ['mushroom', 270, -0.02], ['rock', 384, 0.6]],
+  desert: [['palm', 300, -0.08], ['hut', 358, -0.1], ['cactus', 272, -0.02], ['rock', 384, 0.55], ['cactus', 372, 1.03]],
+  snow: [['pine', 300, -0.08], ['pine', 362, -0.06], ['rock', 272, -0.02], ['pine', 386, 0.6]],
+  castle: [['flag', 292, -0.08], ['pine', 350, -0.08], ['barrel', 272, -0.02], ['crate', 382, 0.55], ['flag', 370, 1.02]],
+  volcano: [['lava', 300, -0.06], ['dead', 360, -0.06], ['lava', 384, 0.6]],
+  sky: [['column', 300, -0.08], ['column', 358, -0.08], ['cloud', 272, -0.02], ['cloud', 384, 0.6]],
+};
+// ground colours of the island top: [grass, sand]
+export const ISLAND_GROUND = {
+  forest: ['#7ccf4e', '#f2d89a'], village: ['#8fcf5a', '#f2d89a'], swamp: ['#5f8a4a', '#c8b88a'], desert: ['#f2cc7a', '#f8e2a8'],
+  snow: ['#f4f8ff', '#d8e4f4'], castle: ['#8a9a7a', '#d8d0b8'], volcano: ['#4a3a3a', '#6a5a5a'], sky: ['#ffffff', '#f0e8ff'],
+};

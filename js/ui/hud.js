@@ -4,6 +4,7 @@ import { on } from '../core/bus.js';
 import { fmt, fmtClock, fmtGem } from '../core/util.js';
 import { B, W, world, challengeBoss } from '../game/battle.js';
 import { avatarSVG } from '../art/avatar.js';
+import { heroLook } from '../game/hero.js';
 import { xpNeed } from '../data/hero.js';
 import { B as BALCFG } from '../data/balance.js';
 const BAL_waves = () => BALCFG.waves;
@@ -50,6 +51,7 @@ export function buildHud() {
   on('modeStart', () => refreshStage());
   on('bossFail', () => { chal.classList.remove('hide'); toast('O chefe escapou! Fique mais forte e desafie de novo.', 'skull'); });
   on('look', refreshAvatar);
+  on('gear', refreshAvatar);
   on('levelUp', refreshAvatar);
   on('farmLoop', () => { refreshStage(); toast('Você foi derrotado! A fase vai se repetir até você desafiar o chefe.', 'skull'); });
   on('dropArrive', k => { const p = k === 'gem' ? mp : gp; p.classList.remove('pulse'); void p.offsetWidth; p.classList.add('pulse'); sfx(k === 'gem' ? 'gem' : 'coin'); });
@@ -58,7 +60,7 @@ export function buildHud() {
 }
 
 export function refreshAvatar() {
-  avatarPic.innerHTML = avatarSVG(S.hero.look);
+  avatarPic.innerHTML = avatarSVG(heroLook());
   lvBadge.textContent = S.hero.lv;
 }
 

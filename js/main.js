@@ -19,12 +19,13 @@ import { buildSide } from './ui/side.js';
 import { updateScreen } from './ui/screens.js';
 import { $, modal, ico, toast } from './ui/dom.js';
 import { biomeLayers, LAYER_H, STRIP } from './art/scenery.js';
-import { humanParts, EW, EH } from './art/enemies.js';
+import { chibiParts, CW, CH } from './art/chibi.js';
 import { shipSVG, SHIP_W, SHIP_H } from './art/ship.js';
 import { SHIP } from './data/ships.js';
 import { migrateSave } from './game/collection.js';
 import { checkShips } from './game/ship.js';
-import { heroSpec } from './render/scene.js';
+import { heroKey } from './render/scene.js';
+import { heroLook } from './game/hero.js';
 import { fx, text } from './game/battle.js';
 import './game/petsBattle.js';
 import { openCreator } from './ui/creator.js';
@@ -46,17 +47,23 @@ function layout() {
   const k = st.width / 390;
   const dockH = $('#dock').offsetHeight / k;
   world.feet = world.H - dockH + 4;
-  world.heroX = 120;
-  B.hero.x = 120;
+  // depth band of the island and the ship deck, measured from the bottom of the field
+  world.gNear = world.feet - 8;
+  world.gFar = world.feet - 116;
+  world.gmid = (world.gNear + world.gFar) / 2;
+  world.deckY = world.feet - 42;
+  world.horizon = world.feet - 172;
+  world.heroX = 132;
+  B.hero.x = 132;
   measure();
 }
 
 async function preload() {
-  const hp = humanParts(heroSpec());
-  const key = 'hero:' + Object.values(heroSpec()).join('|');
+  const hp = chibiParts(heroLook());
+  const key = heroKey();
   const jobs = [];
-  const w = EW * 0.6, h = EH * 0.6;
-  for (const n of ['legB', 'legF', 'body', 'arm']) jobs.push(spriteAsync(key + ':' + n, hp[n], w, h, { flash: true }));
+  const w = CW * 0.64, h = CH * 0.64;
+  for (const n of ['legB', 'legF', 'armB', 'body', 'armF']) jobs.push(spriteAsync(key + ':' + n, hp[n], w, h, { flash: true }));
   const sh = SHIP[S.ships.cur] || SHIP.bote;
   jobs.push(spriteAsync('ship:' + sh.id, shipSVG(sh), SHIP_W * sh.size, SHIP_H * sh.size));
   const r = B.info.region;

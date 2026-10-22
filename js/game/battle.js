@@ -10,9 +10,11 @@ import { gainXp } from './hero.js';
 import { enemyXp, bossXp } from '../data/hero.js';
 
 export const W = 390;
-export const world = { H: 456, feet: 330, heroX: 120, shore: 194, gold: { x: 120, y: 30 }, gems: { x: 220, y: 30 }, shake: 0, flash: 0 };
+// feet: bottom of the visible field. The island ground runs from gFar (far
+// edge) to gNear; the captain stands on the ship deck at deckY.
+export const world = { H: 456, feet: 330, gFar: 242, gNear: 326, gmid: 284, deckY: 300, horizon: 180, heroX: 132, shore: 200, gold: { x: 120, y: 30 }, gems: { x: 220, y: 30 }, shake: 0, flash: 0 };
 
-const hero = { x: 120, hp: 110, max: 110, shield: 0, atkT: 0.5, anim: 0, animLen: 0.28, hitDone: true, hurtT: 0, blinkT: 2, face: 'idle', walk: 0, buffs: [], revived: false, abilityT: 0, victory: 0, dead: 0, squash: 0, lv: 0 };
+const hero = { x: 132, hp: 110, max: 110, shield: 0, atkT: 0.5, anim: 0, animLen: 0.28, hitDone: true, hurtT: 0, blinkT: 2, face: 'idle', walk: 0, buffs: [], revived: false, abilityT: 0, victory: 0, dead: 0, squash: 0, lv: 0 };
 export const B = {
   hero, enemies: [], projs: [], drops: [], texts: [], fx: [], clones: [],
   phase: 'intro', pt: 0, g: 1, info: stageInfo(1), kills: 0, total: BAL.stageKills(), queue: [], spawnT: 0,
@@ -20,6 +22,25 @@ export const B = {
   mode: 'stage', bg: null, onKill: null, modeUpdate: null, onHeroDeath: null,
 };
 let uid = 0;
+// ---------------------------------------------------------------- depth
+// z in [0,1]: 0 = far edge of the island, 1 = near the viewer
+export const zToY = z => world.gFar + 8 + z * (world.gNear - world.gFar - 8);
+export const zScale = z => 0.72 + 0.28 * z;
+// x of the coastline at a ground height (the shore bends toward the ship near the viewer)
+export const shoreAt = y => 244 - (y - world.gFar) / (world.feet - world.gFar) * 54;
+export const gy = e => (e.gy !== undefined ? e.gy : world.feet);
+// formation: at most 5 enemies on the island, spread in depth
+const SLOTS = [{ z: 0.5, dx: 16 }, { z: 0.05, dx: 30 }, { z: 0.95, dx: 22 }, { z: 0.28, dx: 86 }, { z: 0.74, dx: 96 }];
+export const MAX_ON_ISLAND = SLOTS.length;
+function freeSlot(ranged) {
+  const used = new Set(B.enemies.filter(e => e.state !== 'die' && e.state !== 'flee' && e.slot !== undefined).map(e => e.slot));
+  const order = ranged ? [3, 4, 1, 0, 2] : [0, 1, 2, 3, 4];
+  return order.find(i => !used.has(i));
+}
+export function placeAt(e, z, dx) {
+  e.z = z; e.gy = zToY(z);
+  e.stopX = shoreAt(e.gy) + dx;
+}
 // the ship rocks gently; the captain and the crew ride it
 export const shipBob = () => Math.sin(B.time * 1.6) * 2.2;
 
@@ -90,13 +111,16 @@ function spawn(kind, boss = false) {
   const g = B.g;
   const tier = B.info.cycle - 1 + (boss ? 0 : 0);
   const hp = boss ? BAL.bossHp(g) : BAL.enemyHp(g) * (spec.fast ? 0.8 : spec.hat === 'knight' ? 1.4 : 1);
+  const slot = boss ? -1 : freeSlot(!!spec.range);
+  const sl = boss ? { z: 0.5, dx: 30 } : SLOTS[slot];
   const e = {
-    id: ++uid, kind, boss, spec, tier, x: W + 30 + (boss ? 40 : 0), y: 0, hp, max: hp,
+    id: ++uid, kind, boss, spec, tier, x: W + 30 + (boss ? 40 : rand(0, 20)), y: 0, hp, max: hp, slot: boss ? undefined : slot,
     dmg: boss ? BAL.bossDmg(g) : BAL.enemyDmg(g), spd: (boss ? 34 : spec.fast ? 62 : 46) * rand(0.92, 1.08),
     state: 'walk', t: rand(0, 1), atkT: rand(0.6, 1.2), anim: 0, ranged: !!spec.range, flash: 0, knock: 0,
-    vx: 0, vy: 0, rot: 0, alpha: 1, slowT: 0, scale: boss ? 1.62 : 1,
+    vx: 0, vy: 0, rot: 0, alpha: 1, slowT: 0, scale: (boss ? 1.5 : 1) * zScale(sl.z),
     gold: (boss ? BAL.bossGold(g) : BAL.enemyGold(g)),
   };
+  placeAt(e, sl.z, sl.dx);
   B.enemies.push(e);
   return e;
 }
@@ -105,12 +129,12 @@ function spawn(kind, boss = false) {
 export function hitEnemy(e, dmg, o = {}) {
   if (!e || e.state === 'die' || e.state === 'flee') return 0;
   if (e.boss) dmg *= ST.boss * (o.bossX || 1);
-  if (e.endless) { B.rushDmg = (B.rushDmg || 0) + dmg; e.flash = 0.12; text(e.x - 4, world.feet - 70 * e.scale - 6, BAL_fmt(dmg), o.crit ? '#ffcf3a' : o.col || '#ffffff', o.crit ? 25 : o.size || 19, { vy: o.crit ? -60 : -46 }); if (o.crit) world.shake = Math.max(world.shake, S.settings.shake ? 0.12 : 0); return dmg; }
+  if (e.endless) { B.rushDmg = (B.rushDmg || 0) + dmg; e.flash = 0.12; text(e.x - 4, gy(e) - 70 * e.scale - 6, BAL_fmt(dmg), o.crit ? '#ffcf3a' : o.col || '#ffffff', o.crit ? 25 : o.size || 19, { vy: o.crit ? -60 : -46 }); if (o.crit) world.shake = Math.max(world.shake, S.settings.shake ? 0.12 : 0); return dmg; }
   e.hp -= dmg;
   e.flash = 0.12;
   if (!e.boss) e.knock = Math.max(e.knock, o.knock || 7);
   const col = o.col || (o.crit ? '#ffcf3a' : '#ffffff');
-  text(e.x - 4, world.feet - 70 * e.scale - 6, BAL_fmt(dmg), col, o.crit ? 25 : o.size || 19, { vy: o.crit ? -60 : -46 });
+  text(e.x - 4, gy(e) - 70 * e.scale - 6, BAL_fmt(dmg), col, o.crit ? 25 : o.size || 19, { vy: o.crit ? -60 : -46 });
   if (o.crit) world.shake = Math.max(world.shake, S.settings.shake ? 0.12 : 0);
   if (e.hp <= 0) kill(e);
   return dmg;
@@ -121,14 +145,14 @@ export function setDamageFormatter(f) { BAL_fmt = f; }
 function kill(e) {
   e.state = 'die'; e.t = 0; e.flash = 0;
   e.vx = rand(120, 190); e.vy = -rand(240, 320); e.rot = 0;
-  fx('poof', e.x, world.feet - 30 * e.scale, { life: 0.5, s: e.scale });
+  fx('poof', e.x, gy(e) - 30 * e.scale, { life: 0.5, s: e.scale });
   if (B.mode !== 'stage') { if (e.building) { e.vx = 0; e.vy = 0; } S.stats.kills++; if (B.onKill) B.onKill(e); emit('kill', e); return; }
   const gold = e.gold * ST.gold;
   S.gold += gold;
   gainXp(e.boss ? bossXp(B.g) : enemyXp(B.g));
   S.stats.kills++;
   const n = e.boss ? 14 : 4;
-  for (let i = 0; i < n; i++) drop('coin', e.x, world.feet - 40 * e.scale, gold / n);
+  for (let i = 0; i < n; i++) drop('coin', e.x, gy(e) - 40 * e.scale, gold / n, gy(e));
   emit('gold', gold);
   emit('kill', e);
   if (e.boss) {
@@ -137,7 +161,7 @@ function kill(e) {
     if (B.g >= S.maxStage) {
       const gems = Math.round(BAL.bossGems(B.g) * ST.gems);
       S.gems += gems;
-      for (let i = 0; i < 6; i++) drop('gem', e.x, world.feet - 60, gems / 6);
+      for (let i = 0; i < 6; i++) drop('gem', e.x, gy(e) - 60, gems / 6, gy(e));
       emit('gems', gems);
     }
     setPhase('victory');
@@ -148,20 +172,20 @@ function kill(e) {
   }
 }
 
-function drop(kind, x, y, value) {
-  B.drops.push({ kind, x, y, vx: rand(-70, 110), vy: -rand(150, 260), t: 0, state: 'pop', bounce: 0, value, delay: rand(0.35, 0.65) });
+function drop(kind, x, y, value, ground) {
+  B.drops.push({ kind, x, y, ground: ground || world.feet, vx: rand(-70, 110), vy: -rand(150, 260), t: 0, state: 'pop', bounce: 0, value, delay: rand(0.35, 0.65) });
   if (B.drops.length > 70) B.drops.splice(0, B.drops.length - 70);
 }
 
 export function damageHero(d) {
   if (hero.dead) return;
-  if (ST.dodge > 0 && Math.random() < ST.dodge) { text(hero.x, world.feet - 84, 'Esquivou!', '#7ee0ff', 16, { vy: -40 }); fx('dodge', hero.x, world.feet - 40, { life: 0.35 }); return; }
+  if (ST.dodge > 0 && Math.random() < ST.dodge) { text(hero.x, world.deckY - 84, 'Esquivou!', '#7ee0ff', 16, { vy: -40 }); fx('dodge', hero.x, world.deckY - 40, { life: 0.35 }); return; }
   d *= 1 - ST.def;
-  if (hero.shield > 0) { const a = Math.min(hero.shield, d); hero.shield -= a; d -= a; fx('shieldHit', hero.x, world.feet - 40); }
+  if (hero.shield > 0) { const a = Math.min(hero.shield, d); hero.shield -= a; d -= a; fx('shieldHit', hero.x, world.deckY - 40); }
   if (d <= 0) return;
   hero.hp -= d;
   hero.hurtT = 0.25;
-  text(hero.x, world.feet - 80, '-' + BAL_fmt(d), '#ff6b8a', 17, { vy: -38 });
+  text(hero.x, world.deckY - 80, '-' + BAL_fmt(d), '#ff6b8a', 17, { vy: -38 });
   if (hero.hp <= 0) {
     hero.hp = 0; hero.dead = 1;
     S.stats.deaths++;
@@ -188,7 +212,7 @@ export function update(dt) {
       break;
     case 'fight': {
       const live = alive().filter(e => e.state !== 'flee');
-      if (B.queue.length && B.spawnT <= 0 && live.length < 4) {
+      if (B.queue.length && B.spawnT <= 0 && live.length < MAX_ON_ISLAND) {
         spawn(B.queue.shift());
         B.spawnT = rand(0.7, 1.2);
       }
@@ -309,26 +333,15 @@ function updateHero(dt) {
 function heroStrike() {
   const t = front();
   if (!t) return;
-  if (t.x - hero.x > 125) {
-    // too far for a sword swing: send a flying slash instead
-    const [c, cd] = heroCrit();
-    const crit = Math.random() < c;
-    B.projs.push({ kind: 'slash', from: 'hero', x: hero.x + 30, y: world.feet - 44, tx: t, v: 640, dmg: heroAtk() * (crit ? cd : 1), crit, col: '#e8f4ff' });
-    hero.squash = 0.6;
-    emit('heroSpit');
-    return;
-  }
+  // the captain attacks from the deck with flying slashes (double/triple attacks send more)
   const [c, cd] = heroCrit();
   const swings = 1 + (Math.random() < ST.dbl ? 1 : 0) + (Math.random() < ST.trp ? 1 : 0);
   for (let i = 0; i < swings; i++) {
     const crit = Math.random() < c;
     const dmg = heroAtk() * (crit ? cd : 1) * rand(0.95, 1.05);
-    const target = i === 0 ? t : front();
-    if (!target) break;
-    hitEnemy(target, dmg, { crit, size: i ? 17 : 19 });
-    fx(crit ? 'critHit' : 'hit', target.x - 18, world.feet - 36 * target.scale - rand(0, 14), { life: 0.32, rot: rand(-0.6, 0.6), s: target.boss ? 1.4 : 1 });
+    B.projs.push({ kind: 'slash', from: 'hero', x: hero.x + 22 - i * 8, y: world.deckY - 40 + i * 6, tx: i === 0 ? t : null, v: 660, dmg, crit, col: '#e8f4ff' });
   }
-  if (swings > 1) text(hero.x + 10, world.feet - 104, swings === 2 ? 'Duplo!' : 'Triplo!', '#7ff0e0', 15);
+  if (swings > 1) text(hero.x + 10, world.deckY - 104, swings === 2 ? 'Duplo!' : 'Triplo!', '#7ff0e0', 15);
   hero.squash = 1;
   emit('heroHit');
 }
@@ -346,29 +359,23 @@ function updateEnemy(e, dt) {
   }
   if (e.building) { if (B.walking) e.x -= 70 * dt; e.state = 'idle'; return; }
   if (e.state === 'flee') { e.x += 140 * dt; return; }
-  if (B.walking) e.x -= 70 * dt;
   if (hero.dead) { e.state = 'idle'; return; }
   if (e.stunT > 0) { e.stunT -= dt; e.state = 'idle'; e.anim = 0; return; }
-  // stop distance: melee next to the hero, ranged further back; keep a queue
-  const sorted = alive().filter(o => o.state !== 'flee').sort((a, b) => a.x - b.x);
-  const idx = sorted.indexOf(e);
-  const prev = idx > 0 ? sorted[idx - 1] : null;
-  // enemies stay on the island: melee ones stop at the shore, in front of the ship
-  let stop = e.ranged ? hero.x + 175 : Math.max(world.shore + 14 * (e.boss ? 1.4 : 1), hero.x + 62);
-  const prevM = sorted.slice(0, idx).reverse().find(o => o.ranged === e.ranged);
-  if (prevM) stop = Math.max(stop, prevM.x + (prevM.boss ? 64 : 40));
+  // walk to the formation spot on the island
+  if (e.stopX === undefined) placeAt(e, e.z !== undefined ? e.z : 0.5, 30);
+  const stop = e.stopX;
   if (e.x > stop + 1) {
     e.state = 'walk';
     e.x = Math.max(stop, e.x - e.spd * slowMul * dt);
   } else {
     if (e.state === 'walk') e.state = 'idle';
-    const canHit = e.ranged || e.x - hero.x < 140;
+    const canHit = true;
     e.atkT -= dt * slowMul;
     if (e.anim > 0) {
       const before = e.anim;
       e.anim -= dt;
       if (before > 0.16 && e.anim <= 0.16) {
-        if (e.ranged) B.projs.push({ kind: e.spec.weapon === 'bow' ? 'arrow' : 'orbE', from: 'enemy', x: e.x - 24 * e.scale, y: world.feet - 50 * e.scale, v: -300, dmg: e.dmg });
+        if (e.ranged) B.projs.push({ kind: e.spec.weapon === 'bow' ? 'arrow' : 'orbE', from: 'enemy', x: e.x - 24 * e.scale, y: gy(e) - 50 * e.scale, v: 300, dmg: e.dmg });
         else if (canHit) damageHero(e.dmg);
       }
     } else if (e.atkT <= 0 && canHit) {
@@ -383,15 +390,18 @@ function updateProjs(dt) {
   for (const p of B.projs) {
     p.t = (p.t || 0) + dt;
     if (p.from === 'enemy') {
-      p.x += p.v * dt;
-      if (p.x <= hero.x + 20) { p.dead = true; damageHero(p.dmg); fx('hit', hero.x + 16, world.feet - 44, { life: 0.25, s: 0.7 }); }
+      // enemy shots fly to the captain on the deck
+      const tx = hero.x + 14, ty = world.deckY - 40, dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy);
+      p.vy = dy / Math.max(1, d);
+      if (d < 12) { p.dead = true; damageHero(p.dmg); fx('hit', hero.x + 16, world.deckY - 44, { life: 0.25, s: 0.7 }); }
+      else { p.x += dx / d * p.v * dt; p.y += dy / d * p.v * dt; }
     } else {
       const t = p.tx && p.tx.state !== 'die' ? p.tx : front();
       if (!t) { p.dead = true; continue; }
-      const tx = t.x - 10, ty = world.feet - 40 * t.scale;
+      const tx = t.x - 10, ty = gy(t) - 38 * t.scale;
       const dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy);
       if (d < 14) { p.dead = true; hitEnemy(t, p.dmg, { col: p.crit ? '#ffcf3a' : '#ffffff', crit: p.crit, size: 17 }); fx(p.crit ? 'critHit' : 'hit', tx, ty, { life: 0.28, s: 0.85 }); continue; }
-      p.x += dx / d * p.v * dt; p.y += dy / d * p.v * dt;
+      p.vy = dy / d; p.x += dx / d * p.v * dt; p.y += dy / d * p.v * dt;
     }
     if (p.t > 4) p.dead = true;
   }
@@ -403,7 +413,7 @@ function updateDrops(dt) {
     d.t += dt;
     if (d.state === 'pop') {
       d.x += d.vx * dt; d.y += d.vy * dt; d.vy += 760 * dt; d.vx *= 0.98;
-      if (d.y > world.feet - 6) { d.y = world.feet - 6; d.vy *= -0.42; d.vx *= 0.6; d.bounce++; }
+      if (d.y > d.ground - 4) { d.y = d.ground - 4; d.vy *= -0.42; d.vx *= 0.6; d.bounce++; }
       if (d.t > d.delay + 0.25) { d.state = 'fly'; d.ft = 0; d.sx = d.x; d.sy = d.y; }
     } else {
       d.ft += dt * 1.9;
@@ -419,8 +429,9 @@ function updateDrops(dt) {
 }
 
 export function spawnCustom(o) {
-  const e = Object.assign({ id: ++uid, x: W + 30, y: 0, state: 'walk', t: rand(0, 1), atkT: rand(0.6, 1.2), anim: 0, flash: 0, knock: 0, vx: 0, vy: 0, rot: 0, alpha: 1, slowT: 0, scale: 1, tier: 0, ranged: false, spd: 46, gold: 0 }, o);
+  const e = Object.assign({ id: ++uid, x: W + 30, y: 0, z: 0.5, state: 'walk', t: rand(0, 1), atkT: rand(0.6, 1.2), anim: 0, flash: 0, knock: 0, vx: 0, vy: 0, rot: 0, alpha: 1, slowT: 0, scale: 1, tier: 0, ranged: false, spd: 46, gold: 0 }, o);
   e.max = e.max || e.hp;
+  if (!e.building) { e.scale *= zScale(e.z); placeAt(e, e.z, e.dx || 30); } else { e.gy = zToY(e.z); }
   B.enemies.push(e);
   return e;
 }

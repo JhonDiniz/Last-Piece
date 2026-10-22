@@ -1,6 +1,6 @@
 // Skill effects: each one owns its timeline, deals damage on the right frame
 // and draws itself on the battle canvas.
-import { B, W, world, hitEnemy, alive, front, heroAtk, addBuff, fx, text } from '../game/battle.js';
+import { B, W, world, hitEnemy, alive, front, heroAtk, addBuff, fx, text, gy } from '../game/battle.js';
 import { ST } from '../game/stats.js';
 import { rand, clamp } from '../core/util.js';
 import { sfx } from '../core/audio.js';
@@ -22,7 +22,7 @@ export function clearSkillFx() { skillFx.length = 0; }
 
 const dmgOf = (s, lv, mult = 1) => heroAtk() * (s.dmgPct / 100) * ST.skill * mult;
 const hitAll = (s, dmg, filter, o = {}) => { for (const e of alive()) if (!filter || filter(e)) hitEnemy(e, dmg * rand(0.95, 1.05), Object.assign({ col: '#ffe14a', size: 20 }, o)); };
-const eY = e => world.feet - 36 * e.scale;
+const eY = e => gy(e) - 36 * e.scale;
 function shake(v) { world.shake = Math.max(world.shake, v); }
 function cluster() {
   const a = alive().filter(e => e.state !== 'flee').sort((p, q) => p.x - q.x).slice(0, 3);
@@ -72,7 +72,7 @@ const F = {
     const x = cluster();
     return { life: 1.0, x, y: -80, hit: false, ps: [],
       update(f, dt) {
-        if (!f.hit) { const p = Math.min(1, f.t / 0.38); f.y = -80 + (world.feet - 10 + 80) * p * p; if (p >= 1) { f.hit = true; hitAll(s, dmgOf(s, lv), e => Math.abs(e.x - f.x) < 95); shake(0.25); sfx('splash'); f.ps = particles(16, f.x, world.feet - 20, s.col, 220, 0.7, 700, 5); } }
+        if (!f.hit) { const p = Math.min(1, f.t / 0.38); f.y = -80 + (world.gmid - 10 + 80) * p * p; if (p >= 1) { f.hit = true; hitAll(s, dmgOf(s, lv), e => Math.abs(e.x - f.x) < 95); shake(0.25); sfx('splash'); f.ps = particles(16, f.x, world.gmid - 20, s.col, 220, 0.7, 700, 5); } }
         stepParts(f.ps, dt);
       },
       draw(ctx, feet, f) {
@@ -103,8 +103,8 @@ const F = {
           const t = (f.t - b.delay) / 0.45;
           if (t < 0 || b.done) { stepParts(b.ps, dt); continue; }
           const tgt = b.tgt && b.tgt.state !== 'die' ? b.tgt : front();
-          b.tx = tgt ? tgt.x : W - 60; b.ty = tgt ? eY(tgt) : world.feet - 40;
-          const sx = B.hero.x + 24, sy = world.feet - 50;
+          b.tx = tgt ? tgt.x : W - 60; b.ty = tgt ? eY(tgt) : world.gmid - 40;
+          const sx = B.hero.x + 24, sy = world.deckY - 50;
           const tt = Math.min(1, t);
           b.x = sx + (b.tx - sx) * tt; b.y = sy + (b.ty - sy) * tt - Math.sin(tt * Math.PI) * 70;
           if (t >= 1) { b.done = true; if (tgt) hitEnemy(tgt, dmgOf(s, lv), { col: '#d8ff6a', size: 19 }); b.ps = particles(8, b.x, b.y, '#c8f05a', 140, 0.5, 400, 4); sfx('splash'); }
@@ -122,7 +122,7 @@ const F = {
     return { life: 1.3, hits: 0, ps: [],
       update(f, dt) {
         const tg = front(); f.tx = tg ? tg.x : B.hero.x + 120;
-        for (let i = 0; i < 2; i++) if (f.hits === i && f.t > 0.45 + i * 0.5) { f.hits++; hitAll(s, dmgOf(s, lv), e => Math.abs(e.x - f.tx) < 70); shake(0.2); sfx('boom'); f.ps.push(...particles(10, f.tx, world.feet - 6, '#ffffff', 160, 0.4, 600, 4)); }
+        for (let i = 0; i < 2; i++) if (f.hits === i && f.t > 0.45 + i * 0.5) { f.hits++; hitAll(s, dmgOf(s, lv), e => Math.abs(e.x - f.tx) < 70); shake(0.2); sfx('boom'); f.ps.push(...particles(10, f.tx, world.gmid - 6, '#ffffff', 160, 0.4, 600, 4)); }
         stepParts(f.ps, dt);
       },
       draw(ctx, feet, f) {
@@ -140,17 +140,17 @@ const F = {
     addBuff(b);
     sfx('magic');
     const label = s.buff.aspd ? `VATQ +${(b.aspd).toFixed(1).replace('.', ',')}!` : s.buff.crit ? 'Crítico +30%!' : s.buff.atk ? `ATQ +${Math.round(s.buff.atk * 100)}%!` : s.name;
-    text(B.hero.x, world.feet - 110, label, s.col, 20, { life: 1.2, vy: -30 });
-    return { life: 0.9, ps: particles(14, B.hero.x, world.feet - 30, s.col, 120, 0.9, -200, 3.4),
+    text(B.hero.x, world.deckY - 110, label, s.col, 20, { life: 1.2, vy: -30 });
+    return { life: 0.9, ps: particles(14, B.hero.x, world.deckY - 30, s.col, 120, 0.9, -200, 3.4),
       update(f, dt) { stepParts(f.ps, dt); },
-      draw(ctx, feet, f) { const p = f.t / f.life; ring(ctx, B.hero.x, feet - 4, 20 + 70 * p, s.col, 6 * (1 - p), 1 - p); glow(ctx, B.hero.x, feet - 34, 70, s.col, 0.5 * (1 - p)); drawParts(ctx, f.ps, true); } };
+      draw(ctx, feet, f) { const p = f.t / f.life; ring(ctx, B.hero.x, world.deckY - 4, 20 + 70 * p, s.col, 6 * (1 - p), 1 - p); glow(ctx, B.hero.x, world.deckY - 34, 70, s.col, 0.5 * (1 - p)); drawParts(ctx, f.ps, true); } };
   },
   shield(s, lv) {
     const h = B.hero;
     h.shield = Math.max(h.shield, h.max * s.buff.shield * (1 + 0.1 * (lv - 1)));
     const heal = h.max * s.buff.heal;
     h.hp = Math.min(h.max, h.hp + heal);
-    text(h.x, world.feet - 110, '+' + Math.round(heal), '#6fef8f', 18);
+    text(h.x, world.deckY - 110, '+' + Math.round(heal), '#6fef8f', 18);
     sfx('magic');
     setTimeout(() => { h.shield = 0; }, s.dur * 1000);
     return F.buff(Object.assign({}, s, { buff: {}, dur: 0.01 }), lv);
@@ -164,8 +164,8 @@ const F = {
           if (f.t < b.delay) continue;
           if (!b.done) {
             b.y += b.vy * dt; b.x += Math.sin(f.t * 6 + b.wob) * 30 * dt;
-            const hitE = alive().find(e => Math.abs(e.x - b.x) < 30 && b.y > world.feet - 70 * e.scale);
-            if (hitE || b.y > world.feet - 10) { b.done = true; if (hitE) hitEnemy(hitE, dmgOf(s, lv), { col: '#bdf3ff', size: 17 }); b.ps = particles(8, b.x, b.y, '#e8fbff', 120, 0.35, 0, 3); sfx('tap'); }
+            const hitE = alive().find(e => Math.abs(e.x - b.x) < 30 && b.y > world.gmid - 70 * e.scale);
+            if (hitE || b.y > world.gmid - 10) { b.done = true; if (hitE) hitEnemy(hitE, dmgOf(s, lv), { col: '#bdf3ff', size: 17 }); b.ps = particles(8, b.x, b.y, '#e8fbff', 120, 0.35, 0, 3); sfx('tap'); }
           }
           stepParts(b.ps, dt);
         }
@@ -189,7 +189,7 @@ const F = {
       update(f, dt) {
         f.x = B.hero.x - 40 + (W + 120 - B.hero.x) * (f.t / 0.95);
         for (const e of alive()) if (!hitSet.has(e) && e.x < f.x + 20) { hitSet.add(e); hitEnemy(e, dmgOf(s, lv), { col: '#8be0ff', size: 21, knock: 26 }); }
-        if (Math.random() < 0.6) f.ps.push(...particles(1, f.x + rand(-10, 10), world.feet - rand(40, 90), '#e8fbff', 80, 0.5, 300, 3.4));
+        if (Math.random() < 0.6) f.ps.push(...particles(1, f.x + rand(-10, 10), world.gmid - rand(40, 90), '#e8fbff', 80, 0.5, 300, 3.4));
         stepParts(f.ps, dt);
       },
       draw(ctx, feet, f) {
@@ -211,7 +211,7 @@ const F = {
   },
   chain(s, lv) {
     const tg = alive().filter(e => e.state !== 'flee').sort((a, b) => a.x - b.x).slice(0, s.hits);
-    const pts = [{ x: B.hero.x + 20, y: world.feet - 50 }];
+    const pts = [{ x: B.hero.x + 20, y: world.deckY - 50 }];
     sfx('zap');
     return { life: 0.25 + tg.length * 0.08, tg, pts, done: 0,
       update(f, dt) {
@@ -250,9 +250,9 @@ const F = {
     return { life: 1.3, tx, hit: false, ps: [], trail: [],
       update(f, dt) {
         const p = Math.min(1, f.t / 0.55);
-        f.x = W + 40 + (f.tx - W - 40) * p; f.y = -60 + (world.feet - 20 + 60) * p;
+        f.x = W + 40 + (f.tx - W - 40) * p; f.y = -60 + (world.gmid - 20 + 60) * p;
         if (!f.hit) f.trail.push(...particles(2, f.x, f.y, Math.random() < 0.5 ? '#ffd23f' : '#ff7a2a', 40, 0.4, -60, 7));
-        if (!f.hit && p >= 1) { f.hit = true; hitAll(s, dmgOf(s, lv), e => Math.abs(e.x - f.tx) < 120, { col: '#ffb23f', size: 23 }); shake(0.4); world.flash = 0.12; sfx('boom'); f.ps = particles(22, f.tx, world.feet - 20, '#ff7a2a', 260, 0.8, 600, 5); }
+        if (!f.hit && p >= 1) { f.hit = true; hitAll(s, dmgOf(s, lv), e => Math.abs(e.x - f.tx) < 120, { col: '#ffb23f', size: 23 }); shake(0.4); world.flash = 0.12; sfx('boom'); f.ps = particles(22, f.tx, world.gmid - 20, '#ff7a2a', 260, 0.8, 600, 5); }
         stepParts(f.ps, dt); stepParts(f.trail, dt);
       },
       draw(ctx, feet, f) {
@@ -271,7 +271,7 @@ const F = {
           const near = alive().filter(e => Math.abs(e.x - f.x) < 60);
           (near.length ? near : [front()].filter(Boolean)).forEach(e => { hitEnemy(e, dmgOf(s, lv), { col: '#d8fff0', size: 17 }); e.y = Math.min(e.y, -8); });
         }
-        if (Math.random() < 0.7) f.ps.push(...particles(1, f.x + rand(-20, 20), world.feet - 4, '#d8c8a8', 70, 0.5, -100, 4));
+        if (Math.random() < 0.7) f.ps.push(...particles(1, f.x + rand(-20, 20), world.gmid - 4, '#d8c8a8', 70, 0.5, -100, 4));
         stepParts(f.ps, dt);
       },
       draw(ctx, feet, f) {
@@ -290,12 +290,12 @@ const F = {
     return { life: s.dur, cl,
       update(f, dt) {
         if (B.phase !== 'fight' && B.phase !== 'boss') { f.t = f.life; return; }
-        for (const c of f.cl) { c.t -= dt; if (c.t <= 0) { c.t = 0.6; const e = front(); if (e) B.projs.push({ kind: 'spit', from: 'hero', x: B.hero.x + c.dx + 12, y: world.feet - 22, tx: e, v: 520, dmg: heroAtk() * 0.5 * (1 + 0.15 * (lv - 1)) * ST.skill, col: '#e8a8ff' }); } }
+        for (const c of f.cl) { c.t -= dt; if (c.t <= 0) { c.t = 0.6; const e = front(); if (e) B.projs.push({ kind: 'spit', from: 'hero', x: B.hero.x + c.dx + 12, y: world.deckY - 22, tx: e, v: 520, dmg: heroAtk() * 0.5 * (1 + 0.15 * (lv - 1)) * ST.skill, col: '#e8a8ff' }); } }
       },
       draw(ctx, feet, f) {
         const a = Math.min(1, f.t / 0.3, (f.life - f.t) / 0.3);
         ctx.globalAlpha = a;
-        f.cl.forEach((c, i) => { const hop = Math.abs(Math.sin(f.t * 5 + i)) * 4; jelly(ctx, B.hero.x + c.dx, feet + 2 - hop, 40, 34, i ? '#e8a8ff' : '#d07bff'); ctx.fillStyle = OL; ctx.beginPath(); ctx.arc(B.hero.x + c.dx + 2, feet - 14 - hop, 2.4, 0, TAU); ctx.arc(B.hero.x + c.dx + 10, feet - 14 - hop, 2.4, 0, TAU); ctx.fill(); });
+        f.cl.forEach((c, i) => { const hop = Math.abs(Math.sin(f.t * 5 + i)) * 4; jelly(ctx, B.hero.x + c.dx, world.deckY + 2 - hop, 40, 34, i ? '#e8a8ff' : '#d07bff'); ctx.fillStyle = OL; ctx.beginPath(); ctx.arc(B.hero.x + c.dx + 2, world.deckY - 14 - hop, 2.4, 0, TAU); ctx.arc(B.hero.x + c.dx + 10, world.deckY - 14 - hop, 2.4, 0, TAU); ctx.fill(); });
         ctx.globalAlpha = 1;
       } };
   },
@@ -303,7 +303,7 @@ const F = {
     sfx('fire');
     return { life: 1.4, ticks: 0, ps: [],
       update(f, dt) {
-        if (f.t < 1.2) for (let i = 0; i < 4; i++) { const a = rand(-0.22, 0.22); const v = rand(300, 420); f.ps.push({ x: B.hero.x + 30, y: world.feet - 40, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, life: rand(0.45, 0.7), col: Math.random() < 0.5 ? '#ffd23f' : '#ff6a2a', size: rand(6, 11), grav: -60 }); }
+        if (f.t < 1.2) for (let i = 0; i < 4; i++) { const a = rand(-0.22, 0.22); const v = rand(300, 420); f.ps.push({ x: B.hero.x + 30, y: world.deckY - 40, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, life: rand(0.45, 0.7), col: Math.random() < 0.5 ? '#ffd23f' : '#ff6a2a', size: rand(6, 11), grav: -60 }); }
         if (f.ticks < s.hits && f.t > f.ticks * 0.1) { f.ticks++; hitAll(s, dmgOf(s, lv), e => e.x - B.hero.x < 300, { col: '#ffb23f', size: 16 }); }
         for (const p of f.ps) p.size *= 1 + dt * 1.6;
         stepParts(f.ps, dt);
@@ -315,13 +315,13 @@ const F = {
     return { life: 1.2, tg, tx: tg ? tg.x : W - 80, hit: false, ps: [],
       update(f, dt) {
         const p = Math.min(1, f.t / 0.45);
-        f.y = -80 + (world.feet - 30 + 80) * p * p; f.rot = -1.4 + 1.4 * p;
+        f.y = -80 + (world.gmid - 30 + 80) * p * p; f.rot = -1.4 + 1.4 * p;
         if (!f.hit && p >= 1) {
           f.hit = true; shake(0.45); world.flash = 0.15; sfx('boom');
           const e = f.tg && f.tg.state !== 'die' ? f.tg : front();
           if (e) hitEnemy(e, dmgOf(s, lv), { col: '#ffe14a', size: 26, bossX: s.bossX || 1, crit: true });
           hitAll(s, dmgOf(s, lv) * 0.25, o => o !== e && Math.abs(o.x - f.tx) < 90);
-          f.ps = particles(18, f.tx, world.feet - 6, '#ffe680', 240, 0.7, 700, 4.5);
+          f.ps = particles(18, f.tx, world.gmid - 6, '#ffe680', 240, 0.7, 700, 4.5);
         }
         stepParts(f.ps, dt);
       },
@@ -362,8 +362,8 @@ const F = {
       update(f, dt) {
         for (const p of f.st) {
           const t = (f.t - p.d) / 0.35; if (t < 0 || p.done) continue;
-          p.x = p.x0 + (p.tx - p.x0) * Math.min(1, t); p.y = p.y0 + (world.feet - 20 - p.y0) * Math.min(1, t);
-          if (t >= 1) { p.done = true; const e = alive().sort((a, b) => Math.abs(a.x - p.tx) - Math.abs(b.x - p.tx))[0]; if (e && Math.abs(e.x - p.tx) < 70) hitEnemy(e, dmgOf(s, lv), { col: '#fff3a6', size: 17 }); f.ps.push(...particles(5, p.tx, world.feet - 20, '#ffe680', 130, 0.4, 300, 3)); }
+          p.x = p.x0 + (p.tx - p.x0) * Math.min(1, t); p.y = p.y0 + (world.gmid - 20 - p.y0) * Math.min(1, t);
+          if (t >= 1) { p.done = true; const e = alive().sort((a, b) => Math.abs(a.x - p.tx) - Math.abs(b.x - p.tx))[0]; if (e && Math.abs(e.x - p.tx) < 70) hitEnemy(e, dmgOf(s, lv), { col: '#fff3a6', size: 17 }); f.ps.push(...particles(5, p.tx, world.gmid - 20, '#ffe680', 130, 0.4, 300, 3)); }
         }
         stepParts(f.ps, dt);
       },
@@ -379,19 +379,19 @@ const F = {
     return { life: 1.3, hit: false,
       update(f) { if (!f.hit && f.t > 0.45) { f.hit = true; hitAll(s, dmgOf(s, lv), null, { col: '#ffd0d8', size: 26 }); world.flash = 0.3; shake(0.4); sfx('boom'); } },
       draw(ctx, feet, f) {
-        if (!f.hit) glow(ctx, B.hero.x, feet - 34, 30 + 120 * (f.t / 0.45), '#ff8a9a', 0.9);
-        else { const p = (f.t - 0.45) / 0.85; ring(ctx, B.hero.x, feet - 30, 40 + 460 * p, '#ffffff', 12 * (1 - p), 1 - p); glow(ctx, B.hero.x, feet - 34, 220 * (1 - p * 0.5), '#ff4f6a', 1 - p); }
+        if (!f.hit) glow(ctx, B.hero.x, world.deckY - 34, 30 + 120 * (f.t / 0.45), '#ff8a9a', 0.9);
+        else { const p = (f.t - 0.45) / 0.85; ring(ctx, B.hero.x, world.deckY - 30, 40 + 460 * p, '#ffffff', 12 * (1 - p), 1 - p); glow(ctx, B.hero.x, world.deckY - 34, 220 * (1 - p * 0.5), '#ff4f6a', 1 - p); }
       } };
   },
   decree(s, lv) {
     addBuff({ t: s.dur, src: s.id, atk: s.buff.atk });
-    text(B.hero.x, world.feet - 116, 'ATQ +150%!', '#ffe14a', 21, { life: 1.3 });
+    text(B.hero.x, world.deckY - 116, 'ATQ +150%!', '#ffe14a', 21, { life: 1.3 });
     sfx('rare');
     const coins = [];
     for (let i = 0; i < 26; i++) coins.push({ x: B.hero.x + 40 + rand(0, W - B.hero.x - 20), y: -rand(20, 220), vy: rand(260, 360), w: i < 13 ? 0 : 1, done: false });
     return { life: 1.8, coins, waves: 0,
       update(f, dt) {
-        for (const c of f.coins) { c.y += c.vy * dt; if (c.y > world.feet - 6) c.done = true; }
+        for (const c of f.coins) { c.y += c.vy * dt; if (c.y > world.gmid - 6) c.done = true; }
         if (f.waves < 2 && f.t > 0.55 + f.waves * 0.45) { f.waves++; hitAll(s, dmgOf(s, lv), null, { col: '#ffe14a', size: 22 }); sfx('coin'); }
       },
       draw(ctx, feet, f) {
@@ -399,7 +399,7 @@ const F = {
         for (const c of f.coins) if (!c.done && cs) { const sp = Math.abs(Math.cos(f.t * 10 + c.x)); ctx.drawImage(cs.c, c.x - 9 * sp, c.y - 9, 18 * sp + 1, 18); }
         const cr = sprite('sk:crown', icon('star'), 40, 40);
         const p = Math.min(1, f.t / 0.3);
-        glow(ctx, B.hero.x, feet - 110, 50, '#ffd23f', (1 - f.t / f.life));
+        glow(ctx, B.hero.x, world.deckY - 110, 50, '#ffd23f', (1 - f.t / f.life));
         void cr; void p;
       } };
   },
